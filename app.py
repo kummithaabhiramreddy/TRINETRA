@@ -400,20 +400,35 @@ def generate_frames():
 # --- Routes ---
 
 @app.route("/")
+@app.route("/index")
+@app.route("/index.html")
+@app.route("/api/index")
+@app.route("/api/index.py")
+@app.route("/api")
+@app.route("/api/")
 def index():
     return render_template("index.html")
 
 @app.route("/login", methods=["GET", "POST"])
+@app.route("/login.html", methods=["GET", "POST"])
+@app.route("/api/login", methods=["GET", "POST"])
+@app.route("/api/index/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         return redirect(url_for("dashboard_view"))
     return render_template("login.html")
 
 @app.route("/dashboard")
+@app.route("/dashboard.html")
+@app.route("/api/dashboard")
+@app.route("/api/index/dashboard")
 def dashboard_view():
     return render_template("dashboard.html")
 
 @app.route("/camera")
+@app.route("/camera.html")
+@app.route("/api/camera")
+@app.route("/api/index/camera")
 def camera_view():
     return render_template("camera.html")
 
@@ -657,10 +672,33 @@ def proxy_neon_sql():
 
 @app.route("/<path:filename>")
 def serve_static_asset(filename):
+    clean = filename.strip("/")
+    if clean.startswith("api/index.py/"):
+        clean = clean[len("api/index.py/"):]
+    elif clean.startswith("api/index/"):
+        clean = clean[len("api/index/"):]
+    elif clean in ("api/index", "api/index.py", "api"):
+        return render_template("index.html")
+
+    if clean in ("dashboard", "dashboard.html"):
+        return render_template("dashboard.html")
+    if clean in ("login", "login.html"):
+        return render_template("login.html")
+    if clean in ("camera", "camera.html"):
+        return render_template("camera.html")
+    if clean in ("dummy", "dummy.html"):
+        return render_template("dummy.html")
+    if clean in ("index", "index.html"):
+        return render_template("index.html")
+
     for folder in [BASE_DIR, TEMPLATES_DIR, ASSETS_DIR]:
         path = os.path.join(folder, filename)
         if os.path.isfile(path):
             return send_file(path)
+        if filename.startswith("assets/"):
+            sub_path = os.path.join(folder, filename[7:])
+            if os.path.isfile(sub_path):
+                return send_file(sub_path)
     return "Not Found", 404
 
 if __name__ == "__main__":
