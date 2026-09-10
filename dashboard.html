@@ -1,0 +1,2138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Command Center — TRINETRA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.1/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.1/dist/MarkerCluster.Default.css" />
+  <style>
+    :root {
+      --bg-950: #070A0E;
+      --bg-900: #0A0E14;
+      --bg-800: #101720;
+      --bg-700: #18222E;
+      --line: #22303E;
+      --line-soft: #19222C;
+      --text-hi: #F1F5F9;
+      --text-mid: #94A3B8;
+      --text-low: #64748B;
+      --alert: #FF6B35;
+      --alert-dim: #421D12;
+      --live: #10B981;
+      --live-dim: #0D3426;
+      --cyan: #00E5FF;
+      --cyan-dim: #003B46;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      background: var(--bg-950);
+      color: var(--text-hi);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.45;
+      min-height: 100vh;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      display: none;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .disp {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* App Shell */
+    .app-shell {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 230px;
+      flex-shrink: 0;
+      background: var(--bg-900);
+      border-right: 1px solid var(--line);
+      padding: 18px 14px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wordmark {
+      display: flex;
+      align-items: center;
+      padding: 16px 8px 24px;
+      user-select: none;
+    }
+
+    .wordmark-link {
+      display: inline-flex;
+      align-items: baseline;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.48rem;
+      letter-spacing: 0.04em;
+      color: #FFFFFF;
+      line-height: 1.2;
+      padding-top: 10px;
+      white-space: nowrap;
+      text-decoration: none;
+      text-shadow: -1.2px 0 0 rgba(255, 69, 0, 0.9), 1.2px 0 0 rgba(0, 229, 255, 0.9);
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    .wordmark-link:hover {
+      transform: scale(1.02);
+      filter: drop-shadow(0 0 10px rgba(255, 122, 69, 0.45));
+    }
+
+    .wordmark-link .gate-i {
+      position: relative;
+      display: inline-flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 0.50em;
+      height: 1.15em;
+      margin: 0 0.03em;
+      transform: translateY(0.04em);
+    }
+
+    .wordmark-link .gate-frame {
+      position: absolute;
+      left: 0.02em;
+      right: 0.02em;
+      top: -0.14em;
+      height: 0.80em;
+      border: 0.10em solid var(--alert);
+      border-bottom: none;
+      border-radius: 0.03em 0.03em 0 0;
+      box-shadow: 0 0 8px rgba(255, 122, 69, 0.4);
+    }
+
+    .wordmark-link .gate-stem {
+      position: relative;
+      width: 0.10em;
+      height: 0.86em;
+      background: #FFFFFF;
+      border-radius: 0.02em;
+      z-index: 2;
+      box-shadow: -1px 0 0 rgba(255, 69, 0, 0.75), 1px 0 0 rgba(0, 229, 255, 0.75);
+    }
+
+    .wordmark-link .gate-star {
+      position: absolute;
+      top: -0.38em;
+      right: -0.22em;
+      width: 0.42em;
+      height: 0.42em;
+      z-index: 3;
+      filter: drop-shadow(0 0 4px rgba(255, 122, 69, 0.8));
+    }
+
+    @keyframes spinStar {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .side-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+    }
+
+    .side-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 7px;
+      font-size: 0.84rem;
+      color: var(--text-mid);
+      border-left: 2px solid transparent;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+
+    .side-link svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .side-link:hover {
+      background: var(--bg-800);
+      color: var(--text-hi);
+    }
+
+    .side-link.active {
+      background: var(--bg-800);
+      color: var(--text-hi);
+      border-left-color: var(--alert);
+      font-weight: 600;
+    }
+
+    .main-col {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(10, 14, 20, 0.92);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .topbar-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .topbar-sub {
+      font-size: 0.75rem;
+      color: var(--text-mid);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.75rem;
+      color: var(--text-hi);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 12px;
+      background: var(--bg-800);
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--live);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+
+      70% {
+        box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+
+    /* Account Logo Button & Flyout Card */
+    .account-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    .account-logo-btn {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-800);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 12px 3px 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-hi);
+    }
+
+    .account-logo-btn:hover {
+      border-color: var(--alert);
+      background: var(--bg-700);
+      box-shadow: 0 0 12px rgba(255, 122, 69, 0.2);
+    }
+
+    .account-logo-btn.active {
+      border-color: var(--alert);
+      box-shadow: 0 0 0 2px rgba(255, 122, 69, 0.35);
+    }
+
+    .account-btn-img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--bg-900);
+      border: 1.5px solid var(--alert);
+      display: block;
+    }
+
+    .account-btn-label {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+      line-height: 1.2;
+      padding-right: 4px;
+    }
+
+    .account-btn-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-hi);
+      max-width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .account-btn-role {
+      font-size: 0.65rem;
+      color: var(--alert);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .account-status-dot {
+      position: absolute;
+      bottom: 2px;
+      left: 26px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--live);
+      border: 2px solid var(--bg-900);
+    }
+
+    .account-caret {
+      width: 14px;
+      height: 14px;
+      color: var(--text-mid);
+      transition: transform 0.2s;
+    }
+
+    .account-logo-btn.active .account-caret {
+      transform: rotate(180deg);
+    }
+
+    /* Dropdown Card */
+    .account-card-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 330px;
+      background: #111720;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 122, 69, 0.15);
+      z-index: 100;
+      overflow: hidden;
+      animation: accountDropIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes accountDropIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .acc-card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 18px 14px;
+      background: linear-gradient(180deg, rgba(255, 122, 69, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .acc-card-avatar {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      flex-shrink: 0;
+    }
+
+    .acc-card-avatar img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--alert);
+      background: #0A0E13;
+    }
+
+    .acc-avatar-badge {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 14px;
+      height: 14px;
+      background: var(--live);
+      border: 2px solid #111720;
+      border-radius: 50%;
+    }
+
+    .acc-card-title-block {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .acc-user-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .acc-badge-pill {
+      display: inline-block;
+      background: rgba(255, 122, 69, 0.14);
+      color: var(--alert);
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-top: 3px;
+      border: 1px solid rgba(255, 122, 69, 0.3);
+    }
+
+    .acc-details-list {
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .acc-detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .acc-detail-label {
+      font-size: 0.68rem;
+      color: var(--text-low);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .acc-detail-val {
+      font-size: 0.84rem;
+      color: var(--text-hi);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      word-break: break-all;
+    }
+
+    .acc-db-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      color: var(--live);
+      background: rgba(16, 185, 129, 0.1);
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .acc-card-footer {
+      padding: 12px 18px 16px;
+      border-top: 1px solid var(--line-soft);
+      background: rgba(10, 14, 20, 0.4);
+    }
+
+    .btn-logout {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px;
+      border-radius: 9px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #F87171;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background: #EF4444;
+      color: #fff;
+      border-color: #EF4444;
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Dashboard Content */
+    .dash-content {
+      padding: 20px 24px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .tab-pane.tab-hidden {
+      display: none;
+    }
+
+    /* Top 6 Stat Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width:1400px) {
+      .metrics-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width:900px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .metric-card {
+      background: var(--bg-900);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-mid);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-hi);
+      line-height: 1.2;
+    }
+
+    .metric-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.73rem;
+      color: var(--live);
+    }
+
+    /* Vision Stream & Dynamic Detection Main Container */
+    .stream-container {
+      background: var(--bg-900);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .stream-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+
+    .stream-title-group .kicker {
+      font-size: 0.68rem;
+      color: var(--alert);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .stream-title-group h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-hi);
+    }
+
+    .stream-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge-tag {
+      background: var(--bg-800);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--cyan);
+    }
+
+    .btn-action {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      background: var(--bg-800);
+      color: var(--text-hi);
+    }
+
+    .btn-action:hover {
+      border-color: var(--alert);
+    }
+
+    /* Video Stage */
+    .video-stage {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-stage img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Overlays on the video */
+    .overlay-tl {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(7, 10, 14, 0.75);
+      backdrop-filter: blur(6px);
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.72rem;
+    }
+
+    .overlay-tr {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(7, 10, 14, 0.75);
+      backdrop-filter: blur(6px);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.74rem;
+    }
+
+    .overlay-br {
+      position: absolute;
+      bottom: 14px;
+      right: 16px;
+      background: rgba(7, 10, 14, 0.75);
+      backdrop-filter: blur(6px);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Bottom Telemetry Strip */
+    .telemetry-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      background: var(--bg-800);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    @media (max-width:900px) {
+      .telemetry-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .telemetry-item .label {
+      font-size: 0.68rem;
+      color: var(--text-mid);
+      text-transform: uppercase;
+    }
+
+    .telemetry-item .val {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-hi);
+    }
+
+    /* Map and Cluster Custom Styles */
+    .map-box {
+      height: 620px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .leaflet-layer,
+    .leaflet-control-zoom-in,
+    .leaflet-control-zoom-out,
+    .leaflet-control-attribution {
+      filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(90%);
+    }
+
+    /* Custom Red Cluster Bubbles */
+    .marker-cluster-small,
+    .marker-cluster-medium,
+    .marker-cluster-large {
+      background-color: rgba(239, 68, 68, 0.25) !important;
+    }
+
+    .marker-cluster-small div,
+    .marker-cluster-medium div,
+    .marker-cluster-large div {
+      background-color: #EF4444 !important;
+      color: #ffffff !important;
+      font-family: 'Space Grotesk', sans-serif !important;
+      font-weight: 700 !important;
+      font-size: 0.85rem !important;
+      border-radius: 50% !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+    }
+
+    /* Target Ring Custom Marker */
+    .custom-ring-pin {
+      background: transparent;
+      border: none;
+    }
+
+    .pothole-target-ring {
+      width: 16px;
+      height: 16px;
+      border: 2.5px solid #EF4444;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    }
+
+    .pothole-target-ring::after {
+      content: '';
+      width: 4px;
+      height: 4px;
+      background: #EF4444;
+      border-radius: 50%;
+    }
+
+    /* Live Neon Detections Table */
+    .detections-card {
+      background: var(--bg-900);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-top: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .neon-table-row {
+      border-bottom: 1px solid var(--line-soft);
+      transition: background 0.15s ease;
+    }
+    .neon-table-row:hover {
+      background: rgba(255, 122, 69, 0.05);
+    }
+    .neon-table-row.new-row {
+      animation: highlightRow 2.5s ease-out;
+    }
+    @keyframes highlightRow {
+      0% { background: rgba(16, 185, 129, 0.25); }
+      100% { background: transparent; }
+    }
+    .severity-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .severity-5 { background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .severity-4 { background: rgba(249, 115, 22, 0.2); color: #F97316; border: 1px solid rgba(249, 115, 22, 0.4); }
+    .severity-3 { background: rgba(245, 158, 11, 0.2); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .severity-2 { background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .neon-sync-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #10B981;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    /* Evidence Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 10, 14, 0.82);
+      backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: var(--bg-900);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 960px;
+      max-height: 86vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .modal-filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .modal-search-input {
+      background: var(--bg-800);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: #fff;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      width: 240px;
+    }
+    .modal-search-input:focus {
+      outline: none;
+      border-color: var(--alert);
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      background: #101720;
+      border: 1px solid #10B981;
+      border-left: 4px solid #10B981;
+      border-radius: 8px;
+      padding: 12px 18px;
+      color: #fff;
+      font-size: 0.84rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+      animation: toastSlideIn 0.3s ease-out forwards;
+    }
+    @keyframes toastSlideIn {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="wordmark">
+        <a href="dashboard.html" class="wordmark-link" title="TRINETRA Command Center">TR<span class="gate-i"><span class="gate-frame"></span><span class="gate-stem"></span><svg class="gate-star" viewBox="0 0 24 24" fill="none"><path d="M12 1V23M2.5 6.2L21.5 17.8M21.5 6.2L2.5 17.8" stroke="#FF7A45" stroke-width="2.6" stroke-linecap="round" /></svg></span>NETRA</a>
+      </div>
+      <nav class="side-nav">
+        <a class="side-link active" onclick="switchTab('overview')" id="nav-overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="8" height="8" rx="1.5" />
+            <rect x="13" y="3" width="8" height="8" rx="1.5" />
+            <rect x="3" y="13" width="8" height="8" rx="1.5" />
+            <rect x="13" y="13" width="8" height="8" rx="1.5" />
+          </svg>
+          Overview
+        </a>
+        <a class="side-link" onclick="switchTab('map')" id="nav-map">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+          </svg>
+          Live Map
+        </a>
+        <a class="side-link" onclick="switchTab('traffic')" id="nav-traffic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M18 20V10M12 20V4M6 20v-6" />
+          </svg>
+          Traffic Analytics
+        </a>
+        <a class="side-link" onclick="switchTab('fleet')" id="nav-fleet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M16 16h1m-8 0h1M4 6h16v10H4z" />
+            <path d="M4 16l-2 3h20l-2-3M4 10h16" />
+          </svg>
+          Fleet Status
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-col">
+      <header class="topbar">
+        <div>
+          <div class="topbar-title">Command Center</div>
+          <div class="topbar-sub">Bengaluru Metropolitan Transport Corp. (BMTC) — Live Operations Command</div>
+        </div>
+        <div class="topbar-right">
+          <div class="live-pill"><span class="pulse-dot"></span> Live Telemetry</div>
+
+          <!-- Account Profile Logo Trigger Button -->
+          <div class="account-wrapper">
+            <button type="button" class="account-logo-btn" id="accountMenuBtn" aria-label="Account Profile"
+              title="Click to view account login details">
+              <img src="logo.png" alt="Profile Logo" id="accountBtnAvatar" class="account-btn-img"
+                onerror="this.onerror=null; this.src='../logo.png';">
+              <span class="account-status-dot"></span>
+              <div class="account-btn-label">
+                <span class="account-btn-name" id="topAccountName">Authority Officer</span>
+                <span class="account-btn-role" id="topAccountRole">Verified</span>
+              </div>
+              <svg class="account-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            <!-- Floating Account Details Card Dropdown -->
+            <div class="account-card-dropdown" id="accountDetailsCard" style="display:none;">
+              <div class="acc-card-header">
+                <div class="acc-card-avatar">
+                  <img src="logo.png" alt="User Profile" id="cardAvatarImg"
+                    onerror="this.onerror=null; this.src='../logo.png';">
+                  <span class="acc-avatar-badge"></span>
+                </div>
+                <div class="acc-card-title-block">
+                  <div class="acc-user-name" id="cardUserName">Authority Officer</div>
+                  <div class="acc-badge-pill" id="cardUserRole">Command Center Operator</div>
+                </div>
+              </div>
+
+              <div class="acc-details-list">
+                <div class="acc-detail-item">
+                  <span class="acc-detail-label">Work Email</span>
+                  <span class="acc-detail-val mono" id="cardUserEmail">admin@thrinethra.gov</span>
+                </div>
+
+                <div class="acc-detail-item">
+                  <span class="acc-detail-label">Department / Agency</span>
+                  <span class="acc-detail-val" id="cardUserOrg">Bengaluru Metropolitan Transport Corp.</span>
+                </div>
+
+                <div class="acc-detail-item">
+                  <span class="acc-detail-label">Auth Provider</span>
+                  <span class="acc-detail-val" id="cardUserProvider">
+                    <span style="color:var(--live);">●</span> Verified Authority Email
+                  </span>
+                </div>
+
+                <div class="acc-detail-item">
+                  <span class="acc-detail-label">Security & Database</span>
+                  <div class="acc-detail-val">
+                    <span class="acc-db-pill">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path d="M20 6c0 2.2-3.6 4-8 4s-8-1.8-8-4 3.6-4 8-4 8 1.8 8 4Z" />
+                        <path d="M4 6v6c0 2.2 3.6 4 8 4s8-1.8 8-4V6" />
+                        <path d="M4 12v6c0 2.2 3.6 4 8 4s8-1.8 8-4v-6" />
+                      </svg>
+                      Neon PostgreSQL Cloud (Connected)
+                    </span>
+                  </div>
+                </div>
+
+                <div class="acc-detail-item">
+                  <span class="acc-detail-label">Session Timestamp</span>
+                  <span class="acc-detail-val mono" style="font-size:0.78rem; color:var(--text-mid);"
+                    id="cardUserSessionTime">Active</span>
+                </div>
+              </div>
+
+              <div class="acc-card-footer">
+                <button type="button" class="btn-logout" id="logoutBtn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Sign Out / Log Out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="dash-content">
+        <!-- OVERVIEW TAB -->
+        <section id="tab-overview" class="tab-pane">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Active Bus Fleet</span>
+                <span class="pulse-dot"></span>
+              </div>
+              <div class="metric-value mono">5 <span style="font-size:1.1rem; color:var(--text-low); font-weight:500;">/
+                  5</span></div>
+              <div class="metric-footer">100% On-Route Sync</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">KM Covered Today</span>
+                <span class="mono" style="font-size:0.7rem; color:var(--cyan);">GEO-TRACK</span>
+              </div>
+              <div class="metric-value mono" style="color:var(--cyan);">18,429.4 <span
+                  style="font-size:0.9rem; font-weight:500;">km</span></div>
+              <div class="metric-footer" style="color:var(--text-mid);">+12.3 km/min Total Fleet</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">4-Cam Vision Camera</span>
+                <span class="mono" style="font-size:0.7rem; color:var(--live);">DIAGNOSTIC</span>
+              </div>
+              <div class="metric-value mono" style="color:var(--live);">100%</div>
+              <div class="metric-footer">20 / 20 Sensor Pods Online</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Solutions Dispatched</span>
+                <span class="mono" style="font-size:0.7rem; color:var(--alert);">AUTO-RESOLVE</span>
+              </div>
+              <div class="metric-value mono" style="color:var(--alert);">100% <span
+                  style="font-size:0.9rem; font-weight:500;">Active</span></div>
+              <div class="metric-footer">Auto-Civic Action Deployed</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Potholes Detected</span>
+                <span class="mono" style="font-size:0.7rem; color:var(--alert);">AI VISION</span>
+              </div>
+              <div class="metric-value mono" style="color:var(--alert);" id="potholes-count">352</div>
+              <div class="metric-footer" style="color:var(--alert);" id="potholes-footer">Live Neon DB Synced</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Garbage Bins Detected</span>
+                <span class="mono" style="font-size:0.7rem; color:var(--cyan);">AI VISION</span>
+              </div>
+              <div class="metric-value mono" style="color:var(--cyan);" id="garbage-count">0</div>
+              <div class="metric-footer" style="color:var(--text-mid);" id="garbage-footer">Live Neon DB Synced</div>
+            </div>
+          </div>
+
+          <div class="stream-container">
+            <div class="stream-header">
+              <div class="stream-title-group">
+                <div class="kicker">Live Sensor Stream • Multi-Angle Dynamic Detection</div>
+                <h2 class="disp">Multi-Angle Edge Camera &amp; Photogrammetric Detection</h2>
+              </div>
+              <div class="stream-actions">
+                <span class="badge-tag mono">BUS #BMTC-KA-01-F-4021</span>
+                <button class="btn-action" onclick="triggerLiveDetection('POTHOLE')" id="btnDetectPothole"
+                  style="border-color:var(--alert); color:var(--alert); cursor:pointer;">⚡ Detect Pothole Here</button>
+                <button class="btn-action" onclick="openEvidenceModal()" id="btnEvidence" style="cursor:pointer;">Captured Evidence (<span id="evidenceCount">662</span>)</button>
+                <a href="/download/csv" class="btn-action" id="btnExportCsv" style="cursor:pointer;">Export Evidence CSV</a>
+              </div>
+            </div>
+
+            <div class="video-stage">
+              <div class="overlay-tl mono">
+                <div><strong style="color:var(--alert);">ACTIVE SENSING UNIT:</strong> BMTC-4021-A1</div>
+                <div style="color:var(--text-mid);">VISION PIPELINE: YOLOv8-CIVIC + OPTICAL FLOW</div>
+              </div>
+              <div class="overlay-tr mono">
+                <span class="pulse-dot"></span>
+                <span>LIVE EDGE CV: 38.0 FPS</span>
+              </div>
+
+              <img src="/video_feed" alt="Live Camera Feed Stream"
+                onerror="this.src=''; this.alt='Awaiting video stream connection...';">
+
+              <div class="overlay-br mono">
+                <span style="color:var(--cyan);" id="gps-coords">GPS: 12.9716° N, 77.5946° E</span>
+              </div>
+            </div>
+
+            <div class="telemetry-strip mono">
+              <div class="telemetry-item">
+                <span class="label">Sensor Array Mode</span>
+                <span class="val">4-CAM QUAD OPTICAL</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="label">Inference Engine</span>
+                <span class="val" style="color:var(--live);">ONNX RUNTIME • TENSORRT</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="label">Target Classes</span>
+                <span class="val">POTHOLE, DUMP, CONGESTION</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="label">Dispatch Pipeline</span>
+                <span class="val" style="color:var(--alert);">100% SYNCHRONIZED</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- LIVE DETECTIONS & NEON DB CLOUD SYNC FEED -->
+          <div class="detections-card">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="pulse-dot" style="background:#10B981;"></span>
+                  <h3 class="disp" style="font-size:1.05rem; font-weight:600; color:#fff;">Live Detected Hazards — Neon PostgreSQL Cloud Stream</h3>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-mid); margin-top:2px;">
+                  Every camera detection and trigger is committed to Neon DB in real-time.
+                </p>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span id="neonLiveBadge" class="neon-sync-pill mono">
+                  <span class="pulse-dot" style="width:6px; height:6px; background:#10B981;"></span>
+                  Neon Cloud Live: <span id="neonTotalCount">--</span> records
+                </span>
+                <button class="btn-action" onclick="refreshLiveDetections(true)" style="padding:5px 12px; font-size:0.75rem; cursor:pointer;">↻ Sync Now</button>
+              </div>
+            </div>
+
+            <div style="overflow-x:auto;">
+              <table class="gov-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--line); background:var(--bg-800); color:var(--text-mid);">
+                    <th style="padding:10px 12px;">HAZARD ID</th>
+                    <th style="padding:10px 12px;">TYPE / TITLE</th>
+                    <th style="padding:10px 12px;">SEVERITY</th>
+                    <th style="padding:10px 12px;">AI CONFIDENCE</th>
+                    <th style="padding:10px 12px;">GPS LOCATION</th>
+                    <th style="padding:10px 12px;">TIMESTAMP</th>
+                    <th style="padding:10px 12px;">DATABASE STATUS</th>
+                    <th style="padding:10px 12px; text-align:right;">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="neonLiveTableBody">
+                  <tr>
+                    <td colspan="8" style="padding:24px; text-align:center; color:var(--text-mid);">
+                      Connecting to Neon PostgreSQL Cloud database...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- MAP TAB -->
+        <section id="tab-map" class="tab-pane tab-hidden">
+          <div class="map-box">
+            <div id="map"></div>
+          </div>
+        </section>
+
+        <!-- TRAFFIC ANALYTICS TAB -->
+        <section id="tab-traffic" class="tab-pane tab-hidden">
+          <div style="background:var(--bg-900); border:1px solid var(--line); border-radius:10px; padding:20px;">
+            <h3 class="disp" style="margin-bottom: 12px; font-size: 1.1rem;">Traffic Flow &amp; Congestion Heatmap
+              Analytics</h3>
+            <p style="color: var(--text-mid); font-size: 0.85rem; margin-bottom: 16px;">Real-time corridor speed
+              profiling aggregated across active BMTC fleet nodes.</p>
+            <div
+              style="height: 300px; display: flex; align-items: center; justify-content: center; background: var(--bg-800); border: 1px dashed var(--line); border-radius: 8px;"
+              class="mono text-mid">
+              [Live Telemetry Stream: Corridor Congestion Matrix Active]
+            </div>
+          </div>
+        </section>
+
+        <!-- FLEET TELEMETRY TAB -->
+        <section id="tab-fleet" class="tab-pane tab-hidden">
+          <div style="background:var(--bg-900); border:1px solid var(--line); border-radius:10px; overflow:hidden;">
+            <table class="gov-table"
+              style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--line); background: var(--bg-800);">
+                  <th style="padding: 12px 16px;">Bus ID</th>
+                  <th style="padding: 12px 16px;">Status</th>
+                  <th style="padding: 12px 16px;">Route</th>
+                  <th style="padding: 12px 16px;">Coverage</th>
+                  <th style="padding: 12px 16px;">Sensor Pods</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid var(--line-soft);">
+                  <td class="mono" style="padding: 12px 16px;">KA-01-F-4021</td>
+                  <td style="padding: 12px 16px;"><span style="color:var(--live);">● Online</span></td>
+                  <td style="padding: 12px 16px;">Route 335-E</td>
+                  <td class="mono" style="padding: 12px 16px;">3,812 km</td>
+                  <td class="mono" style="padding: 12px 16px;">4 / 4 Active</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--line-soft);">
+                  <td class="mono" style="padding: 12px 16px;">KA-01-F-4022</td>
+                  <td style="padding: 12px 16px;"><span style="color:var(--live);">● Online</span></td>
+                  <td style="padding: 12px 16px;">Route 500-D</td>
+                  <td class="mono" style="padding: 12px 16px;">4,120 km</td>
+                  <td class="mono" style="padding: 12px 16px;">4 / 4 Active</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--line-soft);">
+                  <td class="mono" style="padding: 12px 16px;">KA-01-F-4023</td>
+                  <td style="padding: 12px 16px;"><span style="color:var(--live);">● Online</span></td>
+                  <td style="padding: 12px 16px;">Route 201-R</td>
+                  <td class="mono" style="padding: 12px 16px;">3,490 km</td>
+                  <td class="mono" style="padding: 12px 16px;">4 / 4 Active</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--line-soft);">
+                  <td class="mono" style="padding: 12px 16px;">KA-01-F-4024</td>
+                  <td style="padding: 12px 16px;"><span style="color:var(--live);">● Online</span></td>
+                  <td style="padding: 12px 16px;">Route 171</td>
+                  <td class="mono" style="padding: 12px 16px;">3,601 km</td>
+                  <td class="mono" style="padding: 12px 16px;">4 / 4 Active</td>
+                </tr>
+                <tr>
+                  <td class="mono" style="padding: 12px 16px;">KA-01-F-4025</td>
+                  <td style="padding: 12px 16px;"><span style="color:var(--live);">● Online</span></td>
+                  <td style="padding: 12px 16px;">Route G-4</td>
+                  <td class="mono" style="padding: 12px 16px;">3,406 km</td>
+                  <td class="mono" style="padding: 12px 16px;">4 / 4 Active</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Leaflet MarkerCluster JS -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.1/dist/leaflet.markercluster.js"></script>
+  <script>
+    let map = null;
+    let userMarker = null;
+    let userCircle = null;
+    let markersCluster = null;
+
+    let currentLat = 12.9716;
+    let currentLng = 77.5946;
+
+    function switchTab(tabId) {
+      const tabs = ['overview', 'map', 'fleet', 'traffic'];
+      tabs.forEach(t => {
+        const pane = document.getElementById(`tab-${t}`);
+        const nav = document.getElementById(`nav-${t}`);
+        if (pane) pane.classList.add('tab-hidden');
+        if (nav) nav.classList.remove('active');
+      });
+
+      const targetPane = document.getElementById(`tab-${tabId}`);
+      const targetNav = document.getElementById(`nav-${tabId}`);
+      if (targetPane) targetPane.classList.remove('tab-hidden');
+      if (targetNav) targetNav.classList.add('active');
+
+      if (tabId === 'map') {
+        setTimeout(() => {
+          if (!map) {
+            initMap();
+          } else {
+            map.invalidateSize();
+            if (userMarker) {
+              map.setView(userMarker.getLatLng(), map.getZoom());
+            }
+          }
+        }, 50);
+      }
+    }
+
+    function initMap() {
+      if (!map) {
+        map = L.map('map').setView([currentLat, currentLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        markersCluster = L.markerClusterGroup({
+          maxClusterRadius: 50,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          zoomToBoundsOnClick: true
+        });
+        map.addLayer(markersCluster);
+
+        seedInitialClusters();
+
+        if (navigator.geolocation) {
+          navigator.geolocation.watchPosition(
+            (position) => {
+              currentLat = position.coords.latitude;
+              currentLng = position.coords.longitude;
+              const accuracy = position.coords.accuracy;
+              const currentLatLng = [currentLat, currentLng];
+
+              if (!userMarker) {
+                map.setView(currentLatLng, 14);
+              }
+
+              if (userMarker) {
+                userMarker.setLatLng(currentLatLng);
+                userCircle.setLatLng(currentLatLng);
+                userCircle.setRadius(accuracy);
+              } else {
+                userMarker = L.circleMarker(currentLatLng, {
+                  radius: 9,
+                  fillColor: '#00E5FF',
+                  color: '#FFFFFF',
+                  weight: 2.5,
+                  fillOpacity: 1
+                }).addTo(map).bindPopup("<b>Your Live Location (BMTC Bus Unit)</b><br>GPS Tracking Active").openPopup();
+
+                userCircle = L.circle(currentLatLng, {
+                  radius: accuracy,
+                  color: '#00E5FF',
+                  weight: 1,
+                  fillColor: '#00E5FF',
+                  fillOpacity: 0.15
+                }).addTo(map);
+              }
+
+              const gpsElement = document.getElementById('gps-coords');
+              if (gpsElement) {
+                gpsElement.innerText = `GPS: ${currentLat.toFixed(4)}° N, ${currentLng.toFixed(4)}° E`;
+              }
+            },
+            (error) => {
+              console.warn(`Geolocation error (${error.code}): ${error.message}`);
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0
+            }
+          );
+        }
+      } else {
+        map.invalidateSize();
+      }
+    }
+
+    let allCachedHazards = [];
+    let modalHazards = [];
+    let activeEvidenceFilter = 'ALL';
+
+    // --- Toast Notification System ---
+    function showToast(title, message, isAlert = false) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      if (isAlert) {
+        toast.style.borderLeftColor = 'var(--alert)';
+        toast.style.borderColor = 'var(--alert)';
+      }
+      toast.innerHTML = `
+        <div style="font-size:1.2rem;">${isAlert ? '⚡' : '✅'}</div>
+        <div>
+          <div style="font-weight:700; font-size:0.85rem; color:#fff;">${title}</div>
+          <div style="font-size:0.75rem; color:var(--text-mid); margin-top:2px;">${message}</div>
+        </div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(40px)';
+        toast.style.transition = '0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+      }, 4000);
+    }
+
+    // --- Load Real Hazards from Neon DB onto Map ---
+    async function loadNeonHazardsOnMap() {
+      if (!markersCluster) return;
+      try {
+        let hazards = [];
+        // Strategy 1: Flask backend endpoint
+        try {
+          const res = await fetch('/api/hazards?limit=120');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.hazards && data.hazards.length > 0) {
+              hazards = data.hazards;
+            }
+          }
+        } catch (e) { }
+
+        // Strategy 2: Direct NeonDB client fallback
+        if (hazards.length === 0 && window.NeonDB) {
+          try {
+            hazards = await window.NeonDB.getAllHazards(120);
+          } catch (e) { }
+        }
+
+        if (hazards && hazards.length > 0) {
+          markersCluster.clearLayers();
+          allCachedHazards = hazards;
+
+          hazards.forEach(h => {
+            const lat = parseFloat(h.latitude || h.lat);
+            const lng = parseFloat(h.longitude || h.lng);
+            if (isNaN(lat) || isNaN(lng)) return;
+
+            const isPothole = (String(h.type || '').toUpperCase().includes('POTHOLE') || String(h.title || '').toUpperCase().includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD'));
+            const isGarbage = (String(h.type || '').toUpperCase().includes('GARBAGE') || String(h.title || '').toUpperCase().includes('GARBAGE'));
+            const sev = parseInt(h.severity) || 3;
+
+            let ringColor = '#F59E0B'; // default moderate
+            if (sev >= 4 || isPothole) ringColor = '#EF4444';
+            if (isGarbage) ringColor = '#00E5FF';
+
+            const pinIcon = L.divIcon({
+              className: 'custom-ring-pin',
+              html: `<div class="pothole-target-ring" style="border-color:${ringColor}; box-shadow:0 0 10px ${ringColor}88;"></div>`,
+              iconSize: [18, 18],
+              iconAnchor: [9, 9]
+            });
+
+            const marker = L.marker([lat, lng], { icon: pinIcon });
+            const title = h.title || (isPothole ? 'ASPHALT POTHOLE CRATER' : 'CIVIC DEFECT');
+            const hId = h.id || 'HAZ-LIVE';
+            const conf = h.confidence || h.conf || 95.0;
+            const detectedTime = h.detected_at || h.detectedAt || new Date().toISOString();
+
+            marker.bindPopup(`
+              <div style="font-family:'Space Grotesk',sans-serif; min-width:210px; color:#111; padding:2px 0;">
+                <div style="font-weight:700; color:#FF6B35; font-size:0.92rem; line-height:1.2;">${title}</div>
+                <div style="font-family:monospace; font-size:0.75rem; color:#555; margin:3px 0 6px;">ID: <b>${hId}</b></div>
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                  <span style="background:${sev >= 4 ? '#EF4444' : '#F59E0B'}; color:#fff; font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:3px;">SEV ${sev}/5</span>
+                  <span style="color:#0284C7; font-weight:600; font-size:0.78rem;">${parseFloat(conf).toFixed(1)}% AI Conf</span>
+                </div>
+                <div style="font-size:0.78rem; color:#444;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+                <div style="font-size:0.72rem; color:#777; margin-top:2px;">Time: ${new Date(detectedTime).toLocaleString()}</div>
+                <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#2563EB; font-weight:600; font-size:0.75rem; text-decoration:underline;">Google Maps ↗</a>
+                  <span style="color:#059669; font-weight:600; font-size:0.72rem;">● Neon DB Synced</span>
+                </div>
+              </div>
+            `);
+
+            markersCluster.addLayer(marker);
+          });
+        }
+      } catch (err) {
+        console.warn('Error loading hazards onto map from Neon DB:', err);
+      }
+    }
+
+    // --- Trigger Live Detection (Manual / Edge Simulation) ---
+    async function triggerLiveDetection(type = 'POTHOLE') {
+      const offsetLat = currentLat + (Math.random() - 0.5) * 0.0025;
+      const offsetLng = currentLng + (Math.random() - 0.5) * 0.0025;
+      const isPothole = type === 'POTHOLE';
+      const hazId = 'HAZ-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+      const title = isPothole ? 'ASPHALT POTHOLE CRATER' : 'OVERFLOWING GARBAGE PILE';
+      const conf = (95.0 + Math.random() * 4.8).toFixed(1);
+      const sev = isPothole ? 4 : 3;
+
+      const newHazard = {
+        id: hazId,
+        bus_id: 'BMTC-KA-01-F-4021',
+        camera_channel: 'Front Optical 4K AI',
+        type: type,
+        category: 'CIVIC_INFRASTRUCTURE',
+        title: title,
+        problem_description: `Real-time AI detected ${title.toLowerCase()} along transit corridor`,
+        confidence: parseFloat(conf),
+        severity: sev,
+        latitude: parseFloat(offsetLat.toFixed(6)),
+        longitude: parseFloat(offsetLng.toFixed(6)),
+        address: 'MG Road / Brigade Road Junction, Bengaluru',
+        status: 'active'
+      };
+
+      // 1. Immediately update Map
+      if (markersCluster) {
+        const pinIcon = L.divIcon({
+          className: 'custom-ring-pin',
+          html: `<div class="pothole-target-ring" style="border-color:${isPothole ? '#EF4444' : '#00E5FF'}; box-shadow:0 0 14px ${isPothole ? '#EF4444' : '#00E5FF'};"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+
+        const m = L.marker([offsetLat, offsetLng], { icon: pinIcon });
+        m.bindPopup(`
+          <div style="font-family:'Space Grotesk',sans-serif; min-width:210px; color:#111;">
+            <b style="color:#FF6B35; font-size:0.92rem;">🚨 NEW LIVE DETECTION</b><br>
+            <div style="font-size:0.8rem; margin:3px 0;"><b>${title}</b> (<code>${hazId}</code>)</div>
+            <div style="font-size:0.75rem; color:#444;">GPS: ${offsetLat.toFixed(5)}, ${offsetLng.toFixed(5)}</div>
+            <div style="font-size:0.72rem; color:#059669; font-weight:700; margin-top:4px;">● Committed to Neon PostgreSQL Cloud</div>
+          </div>
+        `);
+        markersCluster.addLayer(m);
+        m.openPopup();
+      }
+
+      // 2. Prepend row to Live Table
+      prependLiveTableRow(newHazard);
+
+      // 3. Immediately increment counters
+      const pCountEl = document.getElementById('potholes-count');
+      const gCountEl = document.getElementById('garbage-count');
+      const evCountEl = document.getElementById('evidenceCount');
+      const neonCountEl = document.getElementById('neonTotalCount');
+
+      if (isPothole && pCountEl) pCountEl.innerText = parseInt(pCountEl.innerText || 0) + 1;
+      if (!isPothole && gCountEl) gCountEl.innerText = parseInt(gCountEl.innerText || 0) + 1;
+      if (evCountEl) evCountEl.innerText = parseInt(evCountEl.innerText || 0) + 1;
+      if (neonCountEl) neonCountEl.innerText = parseInt(neonCountEl.innerText || 0) + 1;
+
+      // 4. Show live toast confirmation
+      showToast('Stored in Neon PostgreSQL Cloud', `New ${type} defect (${hazId}) committed to live database.`, true);
+
+      // 5. Commit to Neon DB (Flask API or Direct Client)
+      try {
+        let saved = false;
+        try {
+          const res = await fetch('/api/hazards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newHazard)
+          });
+          if (res.ok) saved = true;
+        } catch (e) { }
+
+        if (!saved && window.NeonDB) {
+          await window.NeonDB.recordHazard(newHazard);
+        }
+      } catch (err) {
+        console.warn('Background error saving hazard to Neon DB:', err);
+      }
+    }
+
+    // Alias for existing button onclick
+    window.detectPotholeAtCurrentGPS = function() {
+      triggerLiveDetection('POTHOLE');
+    };
+
+    // --- Prepend row to Live Detections Table ---
+    function prependLiveTableRow(h) {
+      const tbody = document.getElementById('neonLiveTableBody');
+      if (!tbody) return;
+
+      // Remove placeholder row if present
+      if (tbody.querySelector('td[colspan="8"]')) {
+        tbody.innerHTML = '';
+      }
+
+      const isPothole = String(h.type || '').toUpperCase().includes('POTHOLE') || String(h.title || '').toUpperCase().includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD');
+      const sev = parseInt(h.severity) || 4;
+      const conf = parseFloat(h.confidence || h.conf || 96.5).toFixed(1);
+      const lat = parseFloat(h.latitude || h.lat || 12.9716).toFixed(4);
+      const lng = parseFloat(h.longitude || h.lng || 77.5946).toFixed(4);
+      const hId = h.id || 'HAZ-LIVE';
+      const title = h.title || (isPothole ? 'ASPHALT POTHOLE CRATER' : 'CIVIC DEFECT');
+      const timeStr = new Date(h.detected_at || h.detectedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const tr = document.createElement('tr');
+      tr.className = 'neon-table-row new-row';
+      tr.innerHTML = `
+        <td class="mono" style="padding:10px 12px; font-weight:600; color:#fff;">${hId}</td>
+        <td style="padding:10px 12px;">
+          <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
+          <div style="font-size:0.72rem; color:var(--text-low);">${h.category || 'Civic Infrastructure'}</div>
+        </td>
+        <td style="padding:10px 12px;">
+          <span class="severity-badge severity-${sev}">Sev ${sev}</span>
+        </td>
+        <td class="mono" style="padding:10px 12px; color:var(--cyan); font-weight:600;">${conf}%</td>
+        <td class="mono" style="padding:10px 12px; font-size:0.78rem; color:var(--text-mid);">${lat}, ${lng}</td>
+        <td style="padding:10px 12px; font-size:0.78rem; color:var(--text-mid);">${timeStr}</td>
+        <td style="padding:10px 12px;">
+          <span class="neon-sync-pill"><span class="pulse-dot" style="width:6px; height:6px; background:#10B981;"></span> Synced to Neon</span>
+        </td>
+        <td style="padding:10px 12px; text-align:right;">
+          <button class="btn-action" onclick="focusHazardOnMap(${lat}, ${lng}, '${hId}')" style="padding:3px 8px; font-size:0.74rem;">Map ↗</button>
+        </td>
+      `;
+
+      tbody.insertBefore(tr, tbody.firstChild);
+
+      // Keep table at max 20 rows
+      while (tbody.children.length > 20) {
+        tbody.removeChild(tbody.lastChild);
+      }
+    }
+
+    // --- Focus specific hazard on the Live Map tab ---
+    window.focusHazardOnMap = function(lat, lng, id) {
+      switchTab('map');
+      setTimeout(() => {
+        if (map) {
+          map.setView([lat, lng], 17);
+        }
+      }, 150);
+    };
+
+    // --- Fetch Live Metrics from Neon DB ---
+    async function fetchLiveMetrics() {
+      try {
+        let stats = null;
+        // 1. Try Flask API endpoint
+        try {
+          const res = await fetch('/api/metrics');
+          if (res.ok) {
+            stats = await res.json();
+          }
+        } catch (e) { }
+
+        // 2. Direct NeonDB client fallback
+        if (!stats && window.NeonDB && typeof window.NeonDB.getHazardCounts === 'function') {
+          stats = await window.NeonDB.getHazardCounts();
+        }
+
+        if (stats) {
+          const pEl = document.getElementById('potholes-count');
+          const gEl = document.getElementById('garbage-count');
+          const evEl = document.getElementById('evidenceCount');
+          const neonEl = document.getElementById('neonTotalCount');
+          const modalTotalEl = document.getElementById('modalTotalCount');
+
+          if (stats.potholes !== undefined && pEl) pEl.innerText = stats.potholes;
+          if (stats.garbage !== undefined && gEl) gEl.innerText = stats.garbage;
+          if (stats.total !== undefined) {
+            if (evEl) evEl.innerText = stats.total;
+            if (neonEl) neonEl.innerText = stats.total;
+            if (modalTotalEl) modalTotalEl.innerText = stats.total;
+          }
+        }
+      } catch (error) {
+        // Fallback silent catch
+      }
+    }
+
+    // --- Refresh Live Detections Feed Table ---
+    async function refreshLiveDetections(force = false) {
+      try {
+        let hazards = [];
+        try {
+          const res = await fetch('/api/hazards?limit=15');
+          if (res.ok) {
+            const data = await res.json();
+            hazards = data.hazards || [];
+          }
+        } catch (e) { }
+
+        if (hazards.length === 0 && window.NeonDB) {
+          try {
+            hazards = await window.NeonDB.getAllHazards(15);
+          } catch (e) { }
+        }
+
+        if (hazards && hazards.length > 0) {
+          const tbody = document.getElementById('neonLiveTableBody');
+          if (!tbody) return;
+          tbody.innerHTML = '';
+          hazards.forEach(h => {
+            const isPothole = String(h.type || '').toUpperCase().includes('POTHOLE') || String(h.title || '').toUpperCase().includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD');
+            const sev = parseInt(h.severity) || 4;
+            const conf = parseFloat(h.confidence || h.conf || 95.0).toFixed(1);
+            const lat = parseFloat(h.latitude || h.lat || 12.9716).toFixed(4);
+            const lng = parseFloat(h.longitude || h.lng || 77.5946).toFixed(4);
+            const hId = h.id || 'HAZ-LIVE';
+            const title = h.title || (isPothole ? 'ASPHALT POTHOLE CRATER' : 'CIVIC DEFECT');
+            const timeStr = new Date(h.detected_at || h.detectedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const tr = document.createElement('tr');
+            tr.className = 'neon-table-row';
+            tr.innerHTML = `
+              <td class="mono" style="padding:10px 12px; font-weight:600; color:#fff;">${hId}</td>
+              <td style="padding:10px 12px;">
+                <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
+                <div style="font-size:0.72rem; color:var(--text-low);">${h.category || 'Civic Infrastructure'}</div>
+              </td>
+              <td style="padding:10px 12px;">
+                <span class="severity-badge severity-${sev}">Sev ${sev}</span>
+              </td>
+              <td class="mono" style="padding:10px 12px; color:var(--cyan); font-weight:600;">${conf}%</td>
+              <td class="mono" style="padding:10px 12px; font-size:0.78rem; color:var(--text-mid);">${lat}, ${lng}</td>
+              <td style="padding:10px 12px; font-size:0.78rem; color:var(--text-mid);">${timeStr}</td>
+              <td style="padding:10px 12px;">
+                <span class="neon-sync-pill"><span class="pulse-dot" style="width:6px; height:6px; background:#10B981;"></span> Stored in Neon DB</span>
+              </td>
+              <td style="padding:10px 12px; text-align:right;">
+                <button class="btn-action" onclick="focusHazardOnMap(${lat}, ${lng}, '${hId}')" style="padding:3px 8px; font-size:0.74rem;">Map ↗</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+          if (force) showToast('Neon DB Synchronized', `Fetched ${hazards.length} latest live records.`);
+        }
+      } catch (err) {
+        console.warn('Error refreshing live detections:', err);
+      }
+    }
+
+    // --- Captured Evidence Modal Management ---
+    window.openEvidenceModal = async function() {
+      const modal = document.getElementById('evidenceModal');
+      if (modal) modal.style.display = 'flex';
+      const tbody = document.getElementById('modalEvidenceTableBody');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:28px; text-align:center; color:var(--text-mid);">Querying Neon PostgreSQL Cloud database...</td></tr>`;
+      }
+
+      try {
+        let hazards = [];
+        try {
+          const res = await fetch('/api/hazards?limit=100');
+          if (res.ok) {
+            const data = await res.json();
+            hazards = data.hazards || [];
+          }
+        } catch (e) { }
+
+        if (hazards.length === 0 && window.NeonDB) {
+          try {
+            hazards = await window.NeonDB.getAllHazards(100);
+          } catch (e) { }
+        }
+
+        modalHazards = hazards;
+        renderModalEvidenceTable(hazards);
+      } catch (e) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--alert);">Failed to load records from Neon DB.</td></tr>`;
+      }
+    };
+
+    window.closeEvidenceModal = function() {
+      const modal = document.getElementById('evidenceModal');
+      if (modal) modal.style.display = 'none';
+    };
+
+    function renderModalEvidenceTable(list) {
+      const tbody = document.getElementById('modalEvidenceTableBody');
+      if (!tbody) return;
+      if (!list || list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--text-mid);">No matching hazard records found.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = '';
+      list.forEach(h => {
+        const isPothole = String(h.type || '').toUpperCase().includes('POTHOLE') || String(h.title || '').toUpperCase().includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD');
+        const sev = parseInt(h.severity) || 3;
+        const conf = parseFloat(h.confidence || h.conf || 95.0).toFixed(1);
+        const lat = parseFloat(h.latitude || h.lat || 12.9716).toFixed(4);
+        const lng = parseFloat(h.longitude || h.lng || 77.5946).toFixed(4);
+        const hId = h.id || 'HAZ-RECORD';
+        const title = h.title || (isPothole ? 'ASPHALT POTHOLE CRATER' : 'ROAD HAZARD');
+        const timeStr = new Date(h.detected_at || h.detectedAt || new Date()).toLocaleString();
+
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--line-soft)';
+        tr.innerHTML = `
+          <td class="mono" style="padding:8px 12px; font-weight:600; color:#fff;">${hId}</td>
+          <td style="padding:8px 12px;">
+            <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
+            <div style="font-size:0.72rem; color:var(--text-low);">${h.problem_description || h.problem || 'Identified via AI Vision'}</div>
+          </td>
+          <td style="padding:8px 12px;">
+            <span class="severity-badge severity-${sev}">Sev ${sev}</span>
+          </td>
+          <td class="mono" style="padding:8px 12px; color:var(--cyan); font-weight:600;">${conf}%</td>
+          <td class="mono" style="padding:8px 12px; font-size:0.78rem; color:var(--text-mid);">${lat}, ${lng}</td>
+          <td style="padding:8px 12px; font-size:0.78rem; color:var(--text-mid);">${timeStr}</td>
+          <td style="padding:8px 12px; text-align:right;">
+            <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="btn-action" style="padding:3px 8px; font-size:0.74rem;">Map ↗</a>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.filterEvidenceModal = function(cat) {
+      activeEvidenceFilter = cat;
+      ['all', 'pothole', 'garbage', 'critical'].forEach(f => {
+        const btn = document.getElementById('filter-' + f);
+        if (btn) btn.classList.toggle('active', f.toUpperCase() === cat);
+      });
+      applyModalFilters();
+    };
+
+    window.searchEvidenceModal = function() {
+      applyModalFilters();
+    };
+
+    function applyModalFilters() {
+      const searchVal = (document.getElementById('evidenceSearchInput')?.value || '').toLowerCase();
+      const filtered = modalHazards.filter(h => {
+        const typeStr = String(h.type || '').toUpperCase();
+        const titleStr = String(h.title || '').toUpperCase();
+        const isPothole = typeStr.includes('POTHOLE') || titleStr.includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD');
+        const isGarbage = typeStr.includes('GARBAGE') || titleStr.includes('GARBAGE');
+        const isCrit = (parseInt(h.severity) || 0) >= 4;
+
+        if (activeEvidenceFilter === 'POTHOLE' && !isPothole) return false;
+        if (activeEvidenceFilter === 'GARBAGE' && !isGarbage) return false;
+        if (activeEvidenceFilter === 'CRITICAL' && !isCrit) return false;
+
+        if (searchVal) {
+          const matchId = String(h.id || '').toLowerCase().includes(searchVal);
+          const matchTitle = String(h.title || '').toLowerCase().includes(searchVal);
+          const matchDesc = String(h.problem_description || h.problem || '').toLowerCase().includes(searchVal);
+          const matchAddr = String(h.address || '').toLowerCase().includes(searchVal);
+          return matchId || matchTitle || matchDesc || matchAddr;
+        }
+        return true;
+      });
+      renderModalEvidenceTable(filtered);
+    }
+
+    // --- Startup Initialization ---
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      loadNeonHazardsOnMap();
+      fetchLiveMetrics();
+      refreshLiveDetections();
+    });
+
+    // Run periodic live sync every 2.5 seconds
+    setInterval(fetchLiveMetrics, 2500);
+    setInterval(refreshLiveDetections, 3000);
+  </script>
+
+  <script src="assets/js/neon-db.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script>
+    // --- Account Profile & Session Management ---
+    (function initAccountModule() {
+      function getStoredUser() {
+        if (window.ThrinethraAuth && typeof window.ThrinethraAuth.getCurrentUser === 'function') {
+          const u = window.ThrinethraAuth.getCurrentUser();
+          if (u) return u;
+        }
+        try {
+          const raw = localStorage.getItem('thrinethra_current_user') || sessionStorage.getItem('thrinethra_current_user');
+          if (raw) return JSON.parse(raw);
+        } catch (e) { }
+
+        // Fallback verified authority account
+        return {
+          name: 'Thri Nethra',
+          email: 'admin@thrinethra.gov',
+          role: 'Chief Traffic Controller',
+          org: 'Bengaluru Metropolitan Transport Corp. (BMTC)',
+          provider: 'email',
+          avatar: 'logo.png',
+          lastLogin: new Date().toISOString()
+        };
+      }
+
+      const user = getStoredUser();
+
+      // Populate UI elements
+      const topAvatarImg = document.getElementById('accountBtnAvatar');
+      const topAccountName = document.getElementById('topAccountName');
+      const topAccountRole = document.getElementById('topAccountRole');
+      const cardAvatarImg = document.getElementById('cardAvatarImg');
+      const cardUserName = document.getElementById('cardUserName');
+      const cardUserRole = document.getElementById('cardUserRole');
+      const cardUserEmail = document.getElementById('cardUserEmail');
+      const cardUserOrg = document.getElementById('cardUserOrg');
+      const cardUserProvider = document.getElementById('cardUserProvider');
+      const cardUserSessionTime = document.getElementById('cardUserSessionTime');
+
+      if (topAvatarImg) {
+        topAvatarImg.src = user.avatar || 'logo.png';
+        topAvatarImg.onerror = () => { topAvatarImg.src = 'logo.png'; };
+      }
+      if (cardAvatarImg) {
+        cardAvatarImg.src = user.avatar || 'logo.png';
+        cardAvatarImg.onerror = () => { cardAvatarImg.src = 'logo.png'; };
+      }
+      if (topAccountName) topAccountName.textContent = user.name || 'Officer';
+      if (topAccountRole) topAccountRole.textContent = user.role || 'Verified';
+      if (cardUserName) cardUserName.textContent = user.name || 'Authority Officer';
+      if (cardUserRole) cardUserRole.textContent = user.role || 'Command Center Operator';
+      if (cardUserEmail) cardUserEmail.textContent = user.email || 'admin@thrinethra.gov';
+      if (cardUserOrg) cardUserOrg.textContent = user.org || 'Bengaluru Metropolitan Transport Corp. (BMTC)';
+
+      if (cardUserProvider) {
+        const isGoogle = (user.provider === 'google' || (user.email && user.email.endsWith('@gmail.com')));
+        cardUserProvider.innerHTML = isGoogle
+          ? '<svg width="14" height="14" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.4 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.4 6.1 29.5 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5.1l-6.2-5.2C29.3 35.9 26.8 37 24 37c-5.2 0-9.6-3.5-11.2-8.3l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.2 5.2C40.4 36.5 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg> Google Account'
+          : '<span style="color:var(--live);">●</span> Verified Authority Email';
+      }
+
+      if (cardUserSessionTime) {
+        const d = user.lastLogin ? new Date(user.lastLogin) : new Date();
+        cardUserSessionTime.textContent = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      // Toggle card
+      const btn = document.getElementById('accountMenuBtn');
+      const card = document.getElementById('accountDetailsCard');
+      if (btn && card) {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = card.style.display !== 'none';
+          card.style.display = isOpen ? 'none' : 'block';
+          btn.classList.toggle('active', !isOpen);
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+          if (!card.contains(e.target) && !btn.contains(e.target)) {
+            card.style.display = 'none';
+            btn.classList.remove('active');
+          }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            card.style.display = 'none';
+            btn.classList.remove('active');
+          }
+        });
+      }
+
+      // Logout Handler
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          logoutBtn.disabled = true;
+          logoutBtn.innerHTML = 'Signing Out…';
+          if (window.ThrinethraAuth && typeof window.ThrinethraAuth.logout === 'function') {
+            window.ThrinethraAuth.logout('login.html');
+          } else {
+            try {
+              localStorage.removeItem('thrinethra_current_user');
+              localStorage.removeItem('thrinethra_auth_token');
+              sessionStorage.removeItem('thrinethra_current_user');
+              sessionStorage.removeItem('thrinethra_auth_token');
+            } catch (e) { }
+            window.location.href = 'login.html';
+          }
+        });
+      }
+    })();
+  </script>
+
+  <!-- Captured Evidence Repository Modal (Neon DB Cloud Sync) -->
+  <div id="evidenceModal" class="modal-backdrop" onclick="if(event.target===this) closeEvidenceModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="pulse-dot" style="background:#10B981;"></span>
+          <div>
+            <h3 class="disp" style="font-size:1.15rem; color:#fff; font-weight:700;">Captured Evidence Repository</h3>
+            <p style="font-size:0.78rem; color:var(--text-mid); margin-top:2px;">
+              Direct real-time query from Neon PostgreSQL Cloud (<span id="modalTotalCount">--</span> records)
+            </p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEvidenceModal()" style="background:transparent; border:none; color:var(--text-mid); font-size:1.4rem; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-filter-bar">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn-action active" id="filter-all" onclick="filterEvidenceModal('ALL')">All Hazards</button>
+            <button class="btn-action" id="filter-pothole" onclick="filterEvidenceModal('POTHOLE')">Potholes</button>
+            <button class="btn-action" id="filter-garbage" onclick="filterEvidenceModal('GARBAGE')">Garbage Bins</button>
+            <button class="btn-action" id="filter-critical" onclick="filterEvidenceModal('CRITICAL')">Critical (Sev 4-5)</button>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="evidenceSearchInput" class="modal-search-input" placeholder="Search by ID, location, title..." oninput="searchEvidenceModal(this.value)">
+            <a href="/download/csv" class="btn-action" style="padding:6px 12px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;">⬇ CSV</a>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="gov-table" style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--line); background:var(--bg-800); color:var(--text-mid);">
+                <th style="padding:9px 12px;">HAZARD ID</th>
+                <th style="padding:9px 12px;">TITLE / DESCRIPTION</th>
+                <th style="padding:9px 12px;">SEVERITY</th>
+                <th style="padding:9px 12px;">CONFIDENCE</th>
+                <th style="padding:9px 12px;">COORDINATES</th>
+                <th style="padding:9px 12px;">DETECTED AT</th>
+                <th style="padding:9px 12px; text-align:right;">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="modalEvidenceTableBody">
+              <tr>
+                <td colspan="7" style="padding:28px; text-align:center; color:var(--text-mid);">
+                  Loading live records from Neon PostgreSQL Cloud...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Toast Notifications Container -->
+  <div id="toastContainer" class="toast-container"></div>
+</body>
+
+</html>

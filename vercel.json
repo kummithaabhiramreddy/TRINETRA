@@ -1,13 +1,26 @@
 {
   "version": 2,
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/assets/(.*)",
       "destination": "/assets/$1"
     },
     {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py?__path__=/api/$1"
+    },
+    {
+      "source": "/download/(.*)",
+      "destination": "/api/index.py?__path__=/download/$1"
+    },
+    {
+      "source": "/video_feed",
+      "destination": "/api/index.py?__path__=/video_feed"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.py?__path__=/$1"
     }
   ]
 }

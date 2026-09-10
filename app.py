@@ -432,6 +432,27 @@ def dashboard_view():
 def camera_view():
     return render_template("camera.html")
 
+@app.route("/forgot-password")
+@app.route("/forgot-password.html")
+@app.route("/api/forgot-password")
+@app.route("/api/index/forgot-password")
+def forgot_password_view():
+    return render_template("forgot-password.html")
+
+@app.route("/report")
+@app.route("/report.html")
+@app.route("/api/report")
+@app.route("/api/index/report")
+def report_view():
+    return render_template("report.html")
+
+@app.route("/reports")
+@app.route("/reports.html")
+@app.route("/api/reports")
+@app.route("/api/index/reports")
+def reports_view():
+    return render_template("reports.html")
+
 @app.route("/video_feed")
 def video_feed():
     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
@@ -686,6 +707,12 @@ def serve_static_asset(filename):
         return render_template("login.html")
     if clean in ("camera", "camera.html"):
         return render_template("camera.html")
+    if clean in ("forgot-password", "forgot-password.html"):
+        return render_template("forgot-password.html")
+    if clean in ("report", "report.html"):
+        return render_template("report.html")
+    if clean in ("reports", "reports.html"):
+        return render_template("reports.html")
     if clean in ("dummy", "dummy.html"):
         return render_template("dummy.html")
     if clean in ("index", "index.html"):
