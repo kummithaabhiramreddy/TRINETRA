@@ -1,0 +1,25 @@
+# Ignore heavy PyTorch weight files (prevents exceeding Vercel 250MB limit)
+*.pt
+weights/
+copgb.pt
+
+# Python bytecode & environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+env/
+
+# Local CSV data files
+hazard_logs.csv
+pothole_logs.csv
+
+# IDE and metadata
+.git/
+.gitignore
+.gemini/
+.agents/
+scratch/
