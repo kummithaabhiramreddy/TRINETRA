@@ -5,7 +5,9 @@ import time
 import random
 import logging
 import threading
+import urllib
 import urllib.request
+import urllib.error
 try:
     import pandas as pd
     HAS_PANDAS = True
@@ -251,12 +253,16 @@ def generate_frames():
         detected_hazards = []
 
         # --- A. DETECT OPERATOR / PERSON TO PREVENT FALSE ALARMS ---
-        base_results = base_model(frame, conf=0.35, imgsz=320, verbose=False)
         person_boxes = []
-        for box in base_results[0].boxes:
-            cls_name = base_model.names[int(box.cls[0])].lower()
-            if cls_name == "person":
-                person_boxes.append(list(map(int, box.xyxy[0])))
+        if base_model is not None:
+            try:
+                base_results = base_model(frame, conf=0.35, imgsz=320, verbose=False)
+                for box in base_results[0].boxes:
+                    cls_name = base_model.names[int(box.cls[0])].lower()
+                    if cls_name == "person":
+                        person_boxes.append(list(map(int, box.xyxy[0])))
+            except Exception:
+                pass
 
         def inside_person(box_coords):
             bx1, by1, bx2, by2 = box_coords
@@ -267,57 +273,65 @@ def generate_frames():
             return False
 
         # --- B. HIGH-ACCURACY POTHOLE DETECTION ---
-        p_res = pothole_model(frame, conf=0.42, imgsz=416, verbose=False)
-        is_fallback_model = (pothole_model.model.names.get(0) == "person")
+        if pothole_model is not None:
+            try:
+                p_res = pothole_model(frame, conf=0.42, imgsz=416, verbose=False)
+                is_fallback_model = (pothole_model.model.names.get(0) == "person")
 
-        for box in p_res[0].boxes:
-            cls_id = int(box.cls[0])
-            if is_fallback_model and cls_id == 0:
-                continue
+                for box in p_res[0].boxes:
+                    cls_id = int(box.cls[0])
+                    if is_fallback_model and cls_id == 0:
+                        continue
 
-            coords = list(map(int, box.xyxy[0]))
-            x1, y1, x2, y2 = coords
-            box_w = x2 - x1
-            box_h = y2 - y1
+                    coords = list(map(int, box.xyxy[0]))
+                    x1, y1, x2, y2 = coords
+                    box_w = x2 - x1
+                    box_h = y2 - y1
 
-            if y1 < int(h_frame * 0.35):
-                continue
-            if box_h > (box_w * 2.2):
-                continue
-            if inside_person(coords):
-                continue
+                    if y1 < int(h_frame * 0.35):
+                        continue
+                    if box_h > (box_w * 2.2):
+                        continue
+                    if inside_person(coords):
+                        continue
 
-            conf = float(box.conf[0])
-            area = box_w * box_h
-            detected_hazards.append({
-                "type": "Pothole",
-                "bbox": coords,
-                "conf": conf,
-                "area": area
-            })
+                    conf = float(box.conf[0])
+                    area = box_w * box_h
+                    detected_hazards.append({
+                        "type": "Pothole",
+                        "bbox": coords,
+                        "conf": conf,
+                        "area": area
+                    })
+            except Exception:
+                pass
 
         # --- C. CUSTOM GARBAGE PILE DETECTION ---
-        g_res = garbage_model(frame, conf=0.48, imgsz=640, verbose=False)
-        for box in g_res[0].boxes:
-            coords = list(map(int, box.xyxy[0]))
-            if inside_person(coords):
-                continue
+        if garbage_model is not None:
+            try:
+                g_res = garbage_model(frame, conf=0.48, imgsz=640, verbose=False)
+                for box in g_res[0].boxes:
+                    coords = list(map(int, box.xyxy[0]))
+                    if inside_person(coords):
+                        continue
 
-            x1, y1, x2, y2 = coords
-            box_width = x2 - x1
-            box_height = y2 - y1
-            area = box_width * box_height
+                    x1, y1, x2, y2 = coords
+                    box_width = x2 - x1
+                    box_height = y2 - y1
+                    area = box_width * box_height
 
-            if y1 < int(h_frame * 0.25):
-                continue
+                    if y1 < int(h_frame * 0.25):
+                        continue
 
-            conf = float(box.conf[0])
-            detected_hazards.append({
-                "type": "Garbage Pile",
-                "bbox": coords,
-                "conf": conf,
-                "area": area
-            })
+                    conf = float(box.conf[0])
+                    detected_hazards.append({
+                        "type": "Garbage Pile",
+                        "bbox": coords,
+                        "conf": conf,
+                        "area": area
+                    })
+            except Exception:
+                pass
 
         # --- D. DRAW ANNOTATIONS ---
         for hazard in detected_hazards:
@@ -350,9 +364,12 @@ def generate_frames():
             haz_id = f"HAZ-{datetime.now().strftime('%m%d%H%M%S')}-{random.randint(10,99)}"
 
             # 1. Local CSV Backup
-            with open(LOG_FILE, mode="a", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow([timestamp, top["type"], severity_str, f"{conf:.2f}", lat, lon])
+            try:
+                with open(LOG_FILE, mode="a", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow([timestamp, top["type"], severity_str, f"{conf:.2f}", lat, lon])
+            except Exception:
+                pass
 
             # 2. Store in Neon Database Cloud
             async_log_hazard_to_neon({
