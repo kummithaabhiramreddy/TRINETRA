@@ -1,4 +1,5 @@
 import os
+import re
 import csv
 import json
 import time
@@ -6,6 +7,7 @@ import random
 import logging
 import threading
 import urllib
+import urllib.parse
 import urllib.request
 import urllib.error
 try:
