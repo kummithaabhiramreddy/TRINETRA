@@ -8,6 +8,7 @@ if ROOT_DIR not in sys.path:
 
 from app import app
 
+import re
 import urllib.parse
 
 class VercelPathMiddleware:
@@ -19,30 +20,43 @@ class VercelPathMiddleware:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
+        # 1. Search for __path__ in RAW_URI, REQUEST_URI, or QUERY_STRING
+        resolved_path = None
+        for uri_key in ("RAW_URI", "REQUEST_URI", "QUERY_STRING"):
+            uri_val = environ.get(uri_key, "")
+            if uri_val and "__path__=" in uri_val:
+                m = re.search(r"[?&]__path__=([^&]+)", uri_val)
+                if m:
+                    clean = urllib.parse.unquote(m.group(1)).split("?")[0]
+                    resolved_path = "/" + clean.lstrip("/")
+                    break
+
+        # 2. Check query string if not found yet
         qs = environ.get("QUERY_STRING", "")
-        params = urllib.parse.parse_qs(qs)
-        
-        # 1. Check if __path__ was forwarded via vercel.json rewrite rule
-        if "__path__" in params and params["__path__"]:
-            target_path = params["__path__"][0]
-            environ["PATH_INFO"] = "/" + target_path.lstrip("/")
+        if qs:
+            params = urllib.parse.parse_qs(qs)
+            if not resolved_path and "__path__" in params and params["__path__"]:
+                resolved_path = "/" + params["__path__"][0].lstrip("/")
             
-            # Clean up __path__ so the Flask endpoint only sees clean query params
-            del params["__path__"]
-            environ["QUERY_STRING"] = urllib.parse.urlencode(params, doseq=True)
+            # Clean up __path__ from query string
+            if "__path__" in params:
+                del params["__path__"]
+                environ["QUERY_STRING"] = urllib.parse.urlencode(params, doseq=True)
+
+        # 3. Check Vercel proxy headers if still not resolved
+        if not resolved_path:
+            for h in ("HTTP_X_FORWARDED_PATH", "HTTP_X_MATCHED_PATH", "HTTP_X_FORWARDED_URI"):
+                val = environ.get(h, "")
+                if val and not val.startswith("/api/index"):
+                    resolved_path = "/" + val.split("?")[0].lstrip("/")
+                    break
+
+        # 4. Apply resolved path or fallback
+        if resolved_path:
+            environ["PATH_INFO"] = resolved_path
         else:
             path_info = environ.get("PATH_INFO", "")
-            orig_path = (
-                environ.get("HTTP_X_FORWARDED_PATH") or
-                environ.get("HTTP_X_MATCHED_PATH") or
-                environ.get("HTTP_X_FORWARDED_URI") or
-                environ.get("RAW_URI") or
-                ""
-            )
-            
-            if orig_path and not orig_path.startswith("/api/index"):
-                environ["PATH_INFO"] = "/" + orig_path.split("?")[0].lstrip("/")
-            elif path_info in ("/api/index", "/api/index.py", "/api/", "/api"):
+            if path_info in ("/api/index", "/api/index.py", "/api/", "/api"):
                 environ["PATH_INFO"] = "/"
 
         return self.wsgi_app(environ, start_response)
