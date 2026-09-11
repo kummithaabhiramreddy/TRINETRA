@@ -144,14 +144,17 @@
           return [];
         }
 
-        // Map array-mode rows to key-value objects
-        const fields = data.fields.map(f => f.name);
-        return data.rows.map(row => {
-          const obj = {};
-          fields.forEach((field, i) => {
-            obj[field] = row[i];
-          });
-          return obj;
+        // Map rows to key-value objects (supports both array-mode and object-mode)
+        const fields = data.fields ? data.fields.map(f => f.name) : [];
+        return (data.rows || []).map(row => {
+          if (Array.isArray(row)) {
+            const obj = {};
+            fields.forEach((field, i) => {
+              obj[field] = row[i];
+            });
+            return obj;
+          }
+          return row;
         });
       } catch (err) {
         console.error('Neon Database Query Error:', err);

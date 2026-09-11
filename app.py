@@ -62,32 +62,74 @@ except Exception:
 BASE_POTHOLES = 42
 BASE_GARBAGE = 19
 
+import socket
+
+# Cache resolved IPs for Neon to bypass faulty or restricted local network DNS
+_NEON_IP_CACHE = {}
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _resilient_getaddrinfo(host, port, *args, **kwargs):
+    try:
+        return _orig_getaddrinfo(host, port, *args, **kwargs)
+    except socket.gaierror:
+        if isinstance(host, str) and ("neon.tech" in host or "aws.neon" in host):
+            if host in _NEON_IP_CACHE:
+                try:
+                    return _orig_getaddrinfo(_NEON_IP_CACHE[host], port, *args, **kwargs)
+                except Exception:
+                    pass
+            for doh_url in [
+                f"https://dns.google/resolve?name={host}&type=A",
+                f"https://cloudflare-dns.com/dns-query?name={host}&type=A"
+            ]:
+                try:
+                    req = urllib.request.Request(doh_url, headers={"Accept": "application/dns-json", "User-Agent": "TRINETRA/1.0"})
+                    with urllib.request.urlopen(req, timeout=4) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        ips = [ans["data"] for ans in data.get("Answer", []) if ans.get("type") == 1]
+                        if ips:
+                            _NEON_IP_CACHE[host] = ips[0]
+                            return _orig_getaddrinfo(ips[0], port, *args, **kwargs)
+                except Exception:
+                    continue
+        raise
+
+socket.getaddrinfo = _resilient_getaddrinfo
+
 # Neon Database Configuration
 NEON_CONN_STRING = "postgresql://neondb_owner:npg_kCrMU0l9LViJ@ep-rapid-sunset-a54uayxa-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 NEON_SQL_ENDPOINT = "https://ep-rapid-sunset-a54uayxa.us-east-2.aws.neon.tech/sql"
 
-def execute_neon_query(query, params=None):
-    """Execute raw SQL query over Neon serverless HTTP endpoint."""
-    try:
-        body = {"query": query.strip()}
-        if params is not None:
-            body["params"] = [str(p) if p is not None else None for p in params]
-        
-        req_data = json.dumps(body).encode("utf-8")
-        neon_req = urllib.request.Request(
-            NEON_SQL_ENDPOINT,
-            data=req_data,
-            headers={
-                "Neon-Connection-String": NEON_CONN_STRING,
-                "Content-Type": "application/json"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(neon_req, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
-        print(f"Neon Query Error: {e}")
-        return None
+def execute_neon_query(query, params=None, array_mode=False):
+    """Execute raw SQL query over Neon serverless HTTP endpoint with automatic DNS fallback and retries."""
+    body = {"query": query.strip()}
+    if params is not None:
+        body["params"] = [str(p) if p is not None else None for p in params]
+    
+    req_data = json.dumps(body).encode("utf-8")
+    headers = {
+        "Neon-Connection-String": NEON_CONN_STRING,
+        "Content-Type": "application/json"
+    }
+    if array_mode:
+        headers["Neon-Array-Mode"] = "true"
+        headers["Neon-Raw-Text-Output"] = "true"
+
+    for attempt in range(3):
+        try:
+            neon_req = urllib.request.Request(
+                NEON_SQL_ENDPOINT,
+                data=req_data,
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(neon_req, timeout=12) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            if attempt == 2:
+                print(f"Neon Query Error (attempt {attempt + 1}): {e}")
+            time.sleep(0.3 * (attempt + 1))
+    return None
 
 def async_log_hazard_to_neon(hazard_data):
     """Fire-and-forget background worker to log detection to Neon DB without delaying streaming FPS."""
