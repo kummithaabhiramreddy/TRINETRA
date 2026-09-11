@@ -226,7 +226,7 @@ if HAS_YOLO:
     except Exception:
         pass
 
-BASE_LAT, BASE_LON = 16.1809, 81.1303
+BASE_LAT, BASE_LON = 12.9716, 77.5946
 last_logged_time = 0
 
 def generate_frames():
@@ -457,6 +457,14 @@ def reports_view():
 
 @app.route("/video_feed")
 def video_feed():
+    # If no webcam or YOLO available (serverless/cloud), return 503 immediately
+    # so the camera.html onerror handler fires and activates the browser camera fallback
+    if not HAS_CV2 or camera_stream is None or not HAS_YOLO or pothole_model is None:
+        return Response(
+            "Camera hardware not available in this deployment environment.",
+            status=503,
+            mimetype="text/plain"
+        )
     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 # --- API Endpoints ---

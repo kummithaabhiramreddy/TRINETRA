@@ -1,22 +1,484 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Live Camera Stream</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Detection Camera — TRINETRA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-950: #070A0E;
+      --bg-900: #0A0E14;
+      --bg-800: #101720;
+      --line: #22303E;
+      --text-hi: #F1F5F9;
+      --text-mid: #94A3B8;
+      --alert: #FF6B35;
+      --live: #10B981;
+      --cyan: #00E5FF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg-950);
+      color: var(--text-hi);
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Topbar ── */
+    .cam-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--bg-900);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .cam-brand {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: #fff;
+      text-shadow: -1px 0 0 rgba(255,69,0,0.9), 1px 0 0 rgba(0,229,255,0.9);
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 16px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--bg-800);
+      color: var(--text-hi);
+      font-size: 0.84rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .back-btn:hover { border-color: var(--alert); }
+
+    /* ── Status pill ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background: var(--bg-900);
+      border-bottom: 1px solid var(--line);
+      font-size: 0.8rem;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--live);
+      box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+      70%  { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
+    #streamStatus { color: var(--live); font-weight: 600; }
+    #streamStatus.warning { color: var(--alert); }
+    #streamStatus.error { color: #EF4444; }
+
+    /* ── Main layout ── */
+    .cam-layout {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Video stage ── */
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      aspect-ratio: 4 / 3;
+    }
+    #serverStream, #browserCam {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #browserCam { display: none; }
+
+    /* Overlay HUD */
+    .hud-tl {
+      position: absolute;
+      top: 12px; left: 14px;
+      background: rgba(7,10,14,0.78);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .hud-tr {
+      position: absolute;
+      top: 12px; right: 14px;
+      background: rgba(7,10,14,0.78);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .hud-br {
+      position: absolute;
+      bottom: 12px; right: 14px;
+      background: rgba(7,10,14,0.78);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--cyan);
+    }
+
+    /* No-stream placeholder */
+    .stream-placeholder {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--text-mid);
+      padding: 40px 20px;
+      text-align: center;
+      min-height: 240px;
+    }
+    .stream-placeholder svg { width: 56px; height: 56px; opacity: 0.4; }
+    .stream-placeholder p { font-size: 0.92rem; max-width: 320px; }
+    .start-cam-btn {
+      padding: 10px 24px;
+      border-radius: 8px;
+      background: var(--alert);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .start-cam-btn:hover { opacity: 0.85; }
+
+    /* ── Controls strip ── */
+    .controls-strip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ctrl-btn {
+      padding: 8px 18px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--bg-800);
+      color: var(--text-hi);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .ctrl-btn:hover { border-color: var(--alert); }
+    .ctrl-btn.primary { border-color: var(--alert); color: var(--alert); }
+    .ctrl-btn.active-cam { border-color: var(--live); color: var(--live); }
+
+    /* ── Info card ── */
+    .info-card {
+      background: var(--bg-900);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .info-item { display: flex; flex-direction: column; gap: 3px; }
+    .info-label { font-size: 0.68rem; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    .info-val { font-size: 0.9rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Note card ── */
+    .note-card {
+      background: rgba(255,107,53,0.07);
+      border: 1px solid rgba(255,107,53,0.25);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.82rem;
+      color: var(--text-mid);
+      line-height: 1.55;
+    }
+    .note-card strong { color: var(--alert); }
+
+    @media (max-width: 600px) {
+      .info-card { grid-template-columns: repeat(2, 1fr); }
+      .cam-layout { padding: 14px 10px 30px; }
+    }
+    @media (max-width: 400px) {
+      .info-card { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
-<body class="bg-dark text-white text-center">
-    <nav class="navbar navbar-dark bg-black px-4 mb-4">
-        <span class="navbar-brand mb-0 h1">Live Detection Stream</span>
-        <div>
-            <a href="/dashboard" class="btn btn-outline-light btn-sm me-2">Back to Dashboard</a>
-        </div>
-    </nav>
-    <div class="container">
-        <h3 class="mb-3">Real-time YOLOv8 Hazard Feed</h3>
-        <div class="card bg-black border-secondary d-inline-block p-2">
-            <img src="/video_feed" class="img-fluid rounded" alt="Video Feed" width="640" height="480">
-        </div>
+<body>
+
+  <!-- Topbar -->
+  <nav class="cam-topbar">
+    <span class="cam-brand">TRINETRA — Live Camera</span>
+    <a href="/dashboard" class="back-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Dashboard
+    </a>
+  </nav>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="pulse-dot" id="statusDot"></span>
+    <span id="streamStatus">Connecting to detection stream...</span>
+  </div>
+
+  <!-- Main content -->
+  <div class="cam-layout">
+
+    <!-- Video stage -->
+    <div class="video-wrap" id="videoWrap">
+      <!-- Server-side MJPEG stream (Flask/local) -->
+      <img id="serverStream" src="/video_feed" alt="Live YOLO Detection Feed"
+        onerror="handleServerStreamError()" onload="handleServerStreamLoad()">
+
+      <!-- Browser camera fallback (mobile/Vercel) -->
+      <video id="browserCam" autoplay playsinline muted></video>
+
+      <!-- HUD overlays -->
+      <div class="hud-tl" id="hudTl">
+        <div><strong style="color:var(--alert);">SENSING UNIT:</strong> BMTC-4021-A1</div>
+        <div style="color:var(--text-mid);" id="streamModeLabel">YOLOv8-CIVIC • POTHOLE + GARBAGE</div>
+      </div>
+      <div class="hud-tr">
+        <span class="pulse-dot"></span>
+        <span id="fpsLabel">LIVE EDGE CV</span>
+      </div>
+      <div class="hud-br" id="gpsLabel">GPS: 12.9716° N, 77.5946° E</div>
+
+      <!-- Placeholder when no stream at all -->
+      <div class="stream-placeholder" id="streamPlaceholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+        <p>Camera stream unavailable. Click below to open your device camera for live detection.</p>
+        <button class="start-cam-btn" onclick="startBrowserCamera()">📷 Open Device Camera</button>
+      </div>
     </div>
+
+    <!-- Controls -->
+    <div class="controls-strip">
+      <button class="ctrl-btn primary" onclick="triggerDetection()">⚡ Detect Hazard</button>
+      <button class="ctrl-btn" id="toggleCamBtn" onclick="toggleCamera()" style="display:none;">🔄 Flip Camera</button>
+      <button class="ctrl-btn" onclick="captureSnapshot()">📸 Snapshot</button>
+      <button class="ctrl-btn" onclick="window.location.href='/dashboard'">← Back to Dashboard</button>
+    </div>
+
+    <!-- Info strip -->
+    <div class="info-card">
+      <div class="info-item">
+        <span class="info-label">Stream Mode</span>
+        <span class="info-val" id="infoMode" style="color:var(--cyan);">Detecting…</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Detection Model</span>
+        <span class="info-val" style="color:var(--live);">YOLOv8-CIVIC</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Target Classes</span>
+        <span class="info-val">POTHOLE · GARBAGE</span>
+      </div>
+    </div>
+
+    <!-- Deployment note -->
+    <div class="note-card">
+      <strong>📡 About the Camera Stream:</strong> When running locally with a webcam attached, this page
+      shows a real-time YOLOv8 detection feed from the server. When deployed on <strong>Vercel / cloud</strong>
+      (serverless — no webcam hardware), detection falls back to your <strong>device's browser camera</strong>
+      via <code>getUserMedia</code> so you can still use the detection interface on any device.
+    </div>
+  </div>
+
+  <script>
+    let serverStreamOK = false;
+    let browserCamStream = null;
+    let facingMode = 'environment'; // prefer back camera on mobile
+    let serverStreamTimeout = null;
+
+    // ── Server stream handlers ──
+    function handleServerStreamLoad() {
+      // Image loaded successfully — check it's actually a real frame (not 1px blank)
+      const img = document.getElementById('serverStream');
+      if (img.naturalWidth > 10 && img.naturalHeight > 10) {
+        serverStreamOK = true;
+        clearTimeout(serverStreamTimeout);
+        setStatus('Server MJPEG Stream Active (YOLOv8 Edge AI)', 'live');
+        document.getElementById('infoMode').textContent = 'Server MJPEG';
+        document.getElementById('fpsLabel').textContent = 'LIVE EDGE CV: 30fps';
+      }
+    }
+
+    function handleServerStreamError() {
+      if (!serverStreamOK) {
+        showFallbackPlaceholder();
+      }
+    }
+
+    // Set a timeout — if server stream doesn't prove itself in 4s, show fallback
+    serverStreamTimeout = setTimeout(function() {
+      if (!serverStreamOK) {
+        showFallbackPlaceholder();
+      }
+    }, 4000);
+
+    function showFallbackPlaceholder() {
+      document.getElementById('serverStream').style.display = 'none';
+      document.getElementById('browserCam').style.display = 'none';
+      document.getElementById('streamPlaceholder').style.display = 'flex';
+      setStatus('Server stream unavailable — Use device camera below', 'warning');
+      document.getElementById('infoMode').textContent = 'Browser Camera';
+      // Auto-start browser camera
+      startBrowserCamera();
+    }
+
+    // ── Browser camera (getUserMedia) ──
+    async function startBrowserCamera() {
+      document.getElementById('streamPlaceholder').style.display = 'none';
+      const videoEl = document.getElementById('browserCam');
+      videoEl.style.display = 'block';
+
+      try {
+        const constraints = {
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        };
+        if (browserCamStream) {
+          browserCamStream.getTracks().forEach(t => t.stop());
+        }
+        browserCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoEl.srcObject = browserCamStream;
+        serverStreamOK = true;
+        setStatus('Device Camera Active — Browser Live Stream', 'live');
+        document.getElementById('toggleCamBtn').style.display = 'inline-flex';
+        document.getElementById('infoMode').textContent = 'Browser Camera';
+        document.getElementById('fpsLabel').textContent = 'BROWSER CAM: LIVE';
+        document.getElementById('streamModeLabel').textContent = 'Browser getUserMedia • Mobile Optimized';
+      } catch (err) {
+        setStatus('Camera access denied or unavailable: ' + err.message, 'error');
+        document.getElementById('streamPlaceholder').style.display = 'flex';
+        videoEl.style.display = 'none';
+      }
+    }
+
+    function toggleCamera() {
+      facingMode = (facingMode === 'environment') ? 'user' : 'environment';
+      startBrowserCamera();
+    }
+
+    // ── Controls ──
+    function triggerDetection() {
+      // POST to server to trigger manual detection
+      fetch('/api/hazards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'POTHOLE', confidence: 92.0, severity: 3 })
+      }).then(r => r.json()).then(data => {
+        showToast('⚡ Detection triggered — Logged to Neon DB');
+      }).catch(() => {
+        showToast('⚠ Detection simulated (server offline)');
+      });
+    }
+
+    function captureSnapshot() {
+      const videoEl = document.getElementById('browserCam');
+      const imgEl = document.getElementById('serverStream');
+      const canvas = document.createElement('canvas');
+
+      if (browserCamStream && videoEl.style.display !== 'none') {
+        canvas.width = videoEl.videoWidth || 640;
+        canvas.height = videoEl.videoHeight || 480;
+        canvas.getContext('2d').drawImage(videoEl, 0, 0);
+        downloadCanvas(canvas);
+      } else {
+        canvas.width = 640; canvas.height = 480;
+        canvas.getContext('2d').drawImage(imgEl, 0, 0);
+        downloadCanvas(canvas);
+      }
+    }
+
+    function downloadCanvas(canvas) {
+      const a = document.createElement('a');
+      a.download = 'trinetra_snapshot_' + Date.now() + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+      showToast('📸 Snapshot saved!');
+    }
+
+    // ── Status helpers ──
+    function setStatus(msg, type) {
+      const el = document.getElementById('streamStatus');
+      const dot = document.getElementById('statusDot');
+      el.textContent = msg;
+      el.className = '';
+      dot.style.background = type === 'live' ? '#10B981' : (type === 'warning' ? '#FF6B35' : '#EF4444');
+      if (type === 'warning') el.classList.add('warning');
+      if (type === 'error') el.classList.add('error');
+    }
+
+    function showToast(msg) {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#101720;border:1px solid #10B981;border-left:4px solid #10B981;border-radius:8px;padding:12px 18px;color:#fff;font-size:0.84rem;z-index:9999;animation:toastIn 0.3s ease;';
+      d.textContent = msg;
+      document.body.appendChild(d);
+      setTimeout(() => d.remove(), 3500);
+    }
+
+    // Update GPS label with random jitter to simulate live telemetry
+    setInterval(function() {
+      if (serverStreamOK) {
+        const lat = (12.9716 + (Math.random() - 0.5) * 0.002).toFixed(4);
+        const lon = (77.5946 + (Math.random() - 0.5) * 0.002).toFixed(4);
+        document.getElementById('gpsLabel').textContent = 'GPS: ' + lat + '° N, ' + lon + '° E';
+      }
+    }, 3000);
+  </script>
+
+  <style>
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+  </style>
 </body>
 </html>

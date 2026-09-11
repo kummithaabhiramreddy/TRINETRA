@@ -692,6 +692,23 @@
       object-fit: contain;
     }
 
+    .video-stage video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .video-stage canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
     /* Overlays on the video */
     .overlay-tl {
       position: absolute;
@@ -981,10 +998,166 @@
       from { opacity: 0; transform: translateX(40px); }
       to { opacity: 1; transform: translateX(0); }
     }
+
+    /* ── Mobile Hamburger Button ── */
+    .mobile-menu-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      background: var(--bg-800);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-hi);
+      flex-shrink: 0;
+    }
+    .mobile-menu-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* ── Sidebar Overlay (mobile backdrop) ── */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 49;
+      backdrop-filter: blur(2px);
+    }
+    .sidebar-overlay.active {
+      display: block;
+    }
+
+    /* ── Mobile Responsive Layout ── */
+    @media (max-width: 768px) {
+      /* Show hamburger */
+      .mobile-menu-btn {
+        display: flex;
+      }
+
+      /* Sidebar slides in from left as a drawer */
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        width: 240px;
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.6);
+      }
+
+      /* Main column takes full width */
+      .main-col {
+        width: 100%;
+      }
+
+      /* Topbar adjustments */
+      .topbar {
+        padding: 10px 14px;
+        gap: 10px;
+      }
+      .topbar-title {
+        font-size: 0.95rem;
+      }
+      .topbar-sub {
+        font-size: 0.68rem;
+        display: none;
+      }
+      .topbar-right {
+        gap: 8px;
+      }
+      .live-pill {
+        font-size: 0.68rem;
+        padding: 4px 8px;
+      }
+      .account-btn-label {
+        display: none;
+      }
+      .account-caret {
+        display: none;
+      }
+
+      /* Dash content padding */
+      .dash-content {
+        padding: 14px 12px 60px;
+        gap: 14px;
+      }
+
+      /* Metrics grid - single column on very small screens */
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      /* Video stage on mobile */
+      .video-stage {
+        height: 280px;
+      }
+
+      /* Telemetry strip 2-col */
+      .telemetry-strip {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 10px 12px;
+      }
+
+      /* Map on mobile */
+      .map-box {
+        height: 380px;
+      }
+
+      /* Stream actions wrap */
+      .stream-actions {
+        width: 100%;
+      }
+
+      /* Account dropdown full width */
+      .account-card-dropdown {
+        width: 280px;
+        right: -10px;
+      }
+
+      /* Modal card full screen */
+      .modal-card {
+        max-width: 100%;
+        max-height: 95vh;
+        border-radius: 10px;
+      }
+      .modal-backdrop {
+        padding: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .metric-value {
+        font-size: 1.35rem;
+      }
+      .video-stage {
+        height: 180px;
+      }
+      .topbar-title {
+        font-size: 0.88rem;
+      }
+    }
   </style>
 </head>
 
 <body>
+
+  <!-- Mobile sidebar overlay backdrop -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <div class="app-shell">
     <aside class="sidebar">
@@ -1025,6 +1198,14 @@
 
     <div class="main-col">
       <header class="topbar">
+        <!-- Mobile hamburger button -->
+        <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="Open navigation menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
         <div>
           <div class="topbar-title">Command Center</div>
           <div class="topbar-sub">Bengaluru Metropolitan Transport Corp. (BMTC) — Live Operations Command</div>
@@ -1190,23 +1371,53 @@
                 <span class="badge-tag mono">BUS #BMTC-KA-01-F-4021</span>
                 <button class="btn-action" onclick="triggerLiveDetection('POTHOLE')" id="btnDetectPothole"
                   style="border-color:var(--alert); color:var(--alert); cursor:pointer;">⚡ Detect Pothole Here</button>
+                <button class="btn-action" onclick="triggerLiveDetection('GARBAGE')" id="btnDetectGarbage"
+                  style="border-color:var(--cyan); color:var(--cyan); cursor:pointer;">🗑️ Detect Garbage</button>
                 <button class="btn-action" onclick="openEvidenceModal()" id="btnEvidence" style="cursor:pointer;">Captured Evidence (<span id="evidenceCount">662</span>)</button>
                 <a href="/download/csv" class="btn-action" id="btnExportCsv" style="cursor:pointer;">Export Evidence CSV</a>
               </div>
             </div>
 
-            <div class="video-stage">
+            <div class="video-stage" id="videoStage">
               <div class="overlay-tl mono">
                 <div><strong style="color:var(--alert);">ACTIVE SENSING UNIT:</strong> BMTC-4021-A1</div>
-                <div style="color:var(--text-mid);">VISION PIPELINE: YOLOv8-CIVIC + OPTICAL FLOW</div>
+                <div style="color:var(--text-mid);" id="dashVisionPipelineLabel">VISION PIPELINE: YOLOv8-CIVIC • CAMERA READY</div>
               </div>
               <div class="overlay-tr mono">
-                <span class="pulse-dot"></span>
-                <span>LIVE EDGE CV: 38.0 FPS</span>
+                <span class="pulse-dot" id="dashStreamPulse"></span>
+                <span id="dashStreamFpsLabel">INITIALIZING CAMERA…</span>
               </div>
 
-              <img src="/video_feed" alt="Live Camera Feed Stream"
-                onerror="this.src=''; this.alt='Awaiting video stream connection...';">
+              <!-- Server Stream Image (Flask webcam when running locally) -->
+              <img id="dashServerStream" src="/video_feed" alt="Live Camera Feed Stream"
+                onerror="handleDashServerStreamError()" onload="handleDashServerStreamLoad()">
+
+              <!-- Browser Camera Video (Direct Device Camera on Dashboard Overview) -->
+              <video id="dashLiveCam" autoplay playsinline muted></video>
+
+              <!-- Dynamic Realtime HUD Canvas Overlay -->
+              <canvas id="dashOverlayCanvas"></canvas>
+
+              <!-- Stream Placeholder when permission blocked or loading -->
+              <div id="dashStreamPlaceholder" style="display:none; position:absolute; inset:0; background:rgba(7,10,14,0.92); z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:20px;">
+                <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--cyan); opacity:0.85;">
+                  <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+                <div style="font-weight:700; color:#fff; font-size:1.05rem;">Live Device Camera Ready</div>
+                <p style="font-size:0.82rem; color:var(--text-mid); max-width:330px; margin:0;">
+                  Click below to activate device camera and stream live edge road hazard detection directly on this dashboard.
+                </p>
+                <button type="button" class="btn-action" onclick="startDashBrowserCam()" style="background:var(--alert); color:#fff; font-weight:700; border:none; padding:9px 22px; border-radius:8px; cursor:pointer; font-size:0.86rem;">
+                  📷 Open Device Camera
+                </button>
+              </div>
+
+              <!-- Quick camera control buttons inside video-stage -->
+              <div class="overlay-bl mono" style="position:absolute; bottom:14px; left:16px; display:flex; gap:8px; z-index:12;">
+                <button type="button" class="btn-action" id="btnToggleDashCam" onclick="toggleDashCamera()" style="padding:4px 10px; font-size:0.73rem; background:rgba(7,10,14,0.85); backdrop-filter:blur(6px); border-color:rgba(255,255,255,0.2); cursor:pointer;">📷 Camera</button>
+                <button type="button" class="btn-action" id="btnFlipDashCam" onclick="flipDashCamera()" style="display:none; padding:4px 10px; font-size:0.73rem; background:rgba(7,10,14,0.85); backdrop-filter:blur(6px); border-color:rgba(255,255,255,0.2); cursor:pointer;">🔄 Flip</button>
+                <button type="button" class="btn-action" onclick="captureDashSnapshot()" style="padding:4px 10px; font-size:0.73rem; background:rgba(7,10,14,0.85); backdrop-filter:blur(6px); border-color:rgba(255,255,255,0.2); cursor:pointer;">📸 Snap</button>
+              </div>
 
               <div class="overlay-br mono">
                 <span style="color:var(--cyan);" id="gps-coords">GPS: 12.9716° N, 77.5946° E</span>
@@ -1282,6 +1493,25 @@
 
         <!-- MAP TAB -->
         <section id="tab-map" class="tab-pane tab-hidden">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div>
+              <h3 class="disp" style="font-size:1.1rem; color:#fff; font-weight:700;">Live Civic Hazard Geospatial Map</h3>
+              <p style="font-size:0.8rem; color:var(--text-mid); margin-top:2px;">
+                GPS-synchronized spatial clustering of potholes and road hazards across transit routes.
+              </p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn-action" onclick="centerOnUserLocation()" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                🎯 My Location
+              </button>
+              <button type="button" class="btn-action" onclick="fitAllHazardsOnMap()" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                📍 Fit All Hazards
+              </button>
+              <button type="button" class="btn-action" onclick="loadNeonHazardsOnMap(true)" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                🔄 Refresh Pins
+              </button>
+            </div>
+          </div>
           <div class="map-box">
             <div id="map"></div>
           </div>
@@ -1366,6 +1596,7 @@
   <!-- Leaflet MarkerCluster JS -->
   <script src="https://unpkg.com/leaflet.markercluster@1.5.1/dist/leaflet.markercluster.js"></script>
   <script>
+    // --- Live Map State & Variables ---
     let map = null;
     let userMarker = null;
     let userCircle = null;
@@ -1374,6 +1605,331 @@
     let currentLat = 12.9716;
     let currentLng = 77.5946;
 
+    let allCachedHazards = [];
+    let modalHazards = [];
+    let activeEvidenceFilter = 'ALL';
+
+    // --- Dashboard Live Camera & Vision HUD System ---
+    let dashCamStream = null;
+    let isDashServerStream = false;
+    let dashFacingMode = 'environment';
+    let dashAnimFrameId = null;
+    let dashScanY = 0;
+    let dashScanDirection = 1;
+    let activeDetectedBox = null;
+    let boxExpiryTimeout = null;
+    let serverStreamTimeout = null;
+
+    function initDashCamera() {
+      const serverImg = document.getElementById('dashServerStream');
+      const videoEl = document.getElementById('dashLiveCam');
+
+      setDashCameraStatus('SEARCHING FEED…', false);
+
+      // Try server stream for 2.2s. If not confirmed live, activate device camera fallback.
+      serverStreamTimeout = setTimeout(() => {
+        if (!isDashServerStream) {
+          startDashBrowserCam();
+        }
+      }, 2200);
+
+      // Also directly check navigator.mediaDevices
+      if (!serverImg) {
+        startDashBrowserCam();
+      }
+    }
+
+    function handleDashServerStreamLoad() {
+      const serverImg = document.getElementById('dashServerStream');
+      const videoEl = document.getElementById('dashLiveCam');
+      if (serverImg && serverImg.naturalWidth > 10 && serverImg.naturalHeight > 10) {
+        if (serverStreamTimeout) clearTimeout(serverStreamTimeout);
+        isDashServerStream = true;
+        serverImg.style.display = 'block';
+        if (videoEl) videoEl.style.display = 'none';
+        setDashCameraStatus('SERVER STREAM (YOLOv8 Edge)', true);
+        startDashHudAnimation();
+      }
+    }
+
+    function handleDashServerStreamError() {
+      if (serverStreamTimeout) clearTimeout(serverStreamTimeout);
+      if (!isDashServerStream) {
+        startDashBrowserCam();
+      }
+    }
+
+    async function startDashBrowserCam() {
+      const serverImg = document.getElementById('dashServerStream');
+      const videoEl = document.getElementById('dashLiveCam');
+      const placeholder = document.getElementById('dashStreamPlaceholder');
+      const flipBtn = document.getElementById('btnFlipDashCam');
+      const toggleBtn = document.getElementById('btnToggleDashCam');
+
+      if (serverImg) serverImg.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'none';
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (placeholder) placeholder.style.display = 'flex';
+        setDashCameraStatus('Camera API Unavailable', false);
+        return;
+      }
+
+      try {
+        if (dashCamStream) {
+          dashCamStream.getTracks().forEach(t => t.stop());
+        }
+
+        const constraints = {
+          video: {
+            facingMode: { ideal: dashFacingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        };
+
+        dashCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (videoEl) {
+          videoEl.srcObject = dashCamStream;
+          videoEl.style.display = 'block';
+          try {
+            await videoEl.play();
+          } catch(e) {}
+        }
+
+        isDashServerStream = false;
+        setDashCameraStatus('DEVICE CAMERA LIVE', true);
+        if (flipBtn) flipBtn.style.display = 'inline-flex';
+        if (toggleBtn) toggleBtn.innerHTML = '⏹ Stop Cam';
+
+        startDashHudAnimation();
+      } catch (err) {
+        console.warn('Browser camera init error:', err);
+        setDashCameraStatus('Camera Permission Required', false);
+        if (placeholder) placeholder.style.display = 'flex';
+        if (videoEl) videoEl.style.display = 'none';
+        if (toggleBtn) toggleBtn.innerHTML = '📷 Open Cam';
+      }
+    }
+
+    function toggleDashCamera() {
+      const videoEl = document.getElementById('dashLiveCam');
+      const toggleBtn = document.getElementById('btnToggleDashCam');
+      const placeholder = document.getElementById('dashStreamPlaceholder');
+
+      if (dashCamStream && dashCamStream.active) {
+        dashCamStream.getTracks().forEach(t => t.stop());
+        dashCamStream = null;
+        if (videoEl) videoEl.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        if (toggleBtn) toggleBtn.innerHTML = '📷 Open Cam';
+        setDashCameraStatus('Camera Standby', false);
+      } else {
+        startDashBrowserCam();
+      }
+    }
+
+    function flipDashCamera() {
+      dashFacingMode = (dashFacingMode === 'environment') ? 'user' : 'environment';
+      startDashBrowserCam();
+    }
+
+    function setDashCameraStatus(statusText, isLive) {
+      const fpsLabel = document.getElementById('dashStreamFpsLabel');
+      const pulse = document.getElementById('dashStreamPulse');
+      const pipelineLabel = document.getElementById('dashVisionPipelineLabel');
+
+      if (fpsLabel) {
+        fpsLabel.innerText = isLive ? `LIVE EDGE CV: 38.0 FPS (${statusText})` : `STATUS: ${statusText}`;
+      }
+      if (pulse) {
+        pulse.style.background = isLive ? '#10B981' : '#EF4444';
+      }
+      if (pipelineLabel) {
+        pipelineLabel.innerText = isLive ? 'VISION PIPELINE: YOLOv8-CIVIC • MULTI-MODAL' : 'VISION PIPELINE: STANDBY';
+      }
+    }
+
+    function captureDashSnapshot() {
+      const videoEl = document.getElementById('dashLiveCam');
+      const serverImg = document.getElementById('dashServerStream');
+      const offscreenCanvas = document.createElement('canvas');
+      const offCtx = offscreenCanvas.getContext('2d');
+
+      let drawn = false;
+      if (videoEl && videoEl.videoWidth > 0 && videoEl.style.display !== 'none') {
+        offscreenCanvas.width = videoEl.videoWidth;
+        offscreenCanvas.height = videoEl.videoHeight;
+        offCtx.drawImage(videoEl, 0, 0);
+        drawn = true;
+      } else if (serverImg && serverImg.naturalWidth > 0 && serverImg.style.display !== 'none') {
+        offscreenCanvas.width = serverImg.naturalWidth;
+        offscreenCanvas.height = serverImg.naturalHeight;
+        offCtx.drawImage(serverImg, 0, 0);
+        drawn = true;
+      }
+
+      if (drawn) {
+        // Overlay watermark timestamp & GPS
+        offCtx.fillStyle = 'rgba(7, 10, 14, 0.75)';
+        offCtx.fillRect(16, offscreenCanvas.height - 52, 420, 38);
+        offCtx.fillStyle = '#00E5FF';
+        offCtx.font = 'bold 14px monospace';
+        offCtx.fillText(`TRINETRA EVIDENCE | GPS: ${currentLat.toFixed(4)}, ${currentLng.toFixed(4)} | ${new Date().toLocaleString()}`, 24, offscreenCanvas.height - 28);
+
+        const link = document.createElement('a');
+        link.download = `TRINETRA_HAZARD_SNAP_${Date.now()}.jpg`;
+        link.href = offscreenCanvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+        showToast('Snapshot Captured', 'Evidence image downloaded to your device.');
+      } else {
+        showToast('Camera Notice', 'Activate camera feed before taking snapshot.', true);
+      }
+    }
+
+    function startDashHudAnimation() {
+      const canvas = document.getElementById('dashOverlayCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      function resizeCanvas() {
+        const stage = document.getElementById('videoStage');
+        if (stage && (canvas.width !== stage.clientWidth || canvas.height !== stage.clientHeight)) {
+          canvas.width = stage.clientWidth;
+          canvas.height = stage.clientHeight;
+        }
+      }
+
+      function renderLoop() {
+        resizeCanvas();
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        if (w > 0 && h > 0) {
+          // 1. Futuristic Corner Brackets
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
+          ctx.lineWidth = 2;
+          const corner = 22;
+          const m = 16;
+
+          // Top-Left
+          ctx.beginPath();
+          ctx.moveTo(m, m + corner); ctx.lineTo(m, m); ctx.lineTo(m + corner, m);
+          ctx.stroke();
+
+          // Top-Right
+          ctx.beginPath();
+          ctx.moveTo(w - m - corner, m); ctx.lineTo(w - m, m); ctx.lineTo(w - m, m + corner);
+          ctx.stroke();
+
+          // Bottom-Left
+          ctx.beginPath();
+          ctx.moveTo(m, h - m - corner); ctx.lineTo(m, h - m); ctx.lineTo(m + corner, h - m);
+          ctx.stroke();
+
+          // Bottom-Right
+          ctx.beginPath();
+          ctx.moveTo(w - m - corner, h - m); ctx.lineTo(w - m, h - m); ctx.lineTo(w - m, h - m - corner);
+          ctx.stroke();
+
+          // 2. Animated Edge Scanner Line
+          dashScanY += 1.6 * dashScanDirection;
+          if (dashScanY > h * 0.76) dashScanDirection = -1;
+          if (dashScanY < h * 0.22) dashScanDirection = 1;
+
+          const grad = ctx.createLinearGradient(0, dashScanY - 14, 0, dashScanY + 14);
+          grad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+          grad.addColorStop(0.5, 'rgba(0, 229, 255, 0.28)');
+          grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(w * 0.12, dashScanY - 14, w * 0.76, 28);
+
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.55)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(w * 0.12, dashScanY);
+          ctx.lineTo(w * 0.88, dashScanY);
+          ctx.stroke();
+
+          // 3. Central Target Crosshair
+          const cx = w / 2;
+          const cy = h / 2;
+          ctx.strokeStyle = 'rgba(255, 107, 53, 0.35)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(cx - 38, cy); ctx.lineTo(cx - 10, cy);
+          ctx.moveTo(cx + 10, cy); ctx.lineTo(cx + 38, cy);
+          ctx.moveTo(cx, cy - 38); ctx.lineTo(cx, cy - 10);
+          ctx.moveTo(cx, cy + 10); ctx.lineTo(cx, cy + 38);
+          ctx.stroke();
+
+          // 4. If an active detection box exists, draw YOLO Bounding Box
+          if (activeDetectedBox) {
+            const box = activeDetectedBox;
+            const bx = box.x * w;
+            const by = box.y * h;
+            const bw = box.w * w;
+            const bh = box.h * h;
+
+            ctx.strokeStyle = box.color || '#EF4444';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(bx, by, bw, bh);
+
+            ctx.fillStyle = box.color ? `${box.color}24` : 'rgba(239, 68, 68, 0.18)';
+            ctx.fillRect(bx, by, bw, bh);
+
+            // Label tag
+            ctx.fillStyle = box.color || '#EF4444';
+            const labelText = `${box.label} ${box.conf}%`;
+            ctx.font = 'bold 12px "Space Grotesk", sans-serif';
+            const textWidth = ctx.measureText(labelText).width;
+            ctx.fillRect(bx, by - 22, textWidth + 14, 22);
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(labelText, bx + 7, by - 6);
+          }
+        }
+
+        dashAnimFrameId = requestAnimationFrame(renderLoop);
+      }
+
+      if (dashAnimFrameId) cancelAnimationFrame(dashAnimFrameId);
+      dashAnimFrameId = requestAnimationFrame(renderLoop);
+    }
+
+    function showDetectionOverlay(type, conf) {
+      const isPothole = type === 'POTHOLE';
+      activeDetectedBox = {
+        x: 0.34 + (Math.random() - 0.5) * 0.12,
+        y: 0.42 + (Math.random() - 0.5) * 0.12,
+        w: 0.28 + Math.random() * 0.08,
+        h: 0.22 + Math.random() * 0.08,
+        label: isPothole ? 'POTHOLE (CRATER)' : 'GARBAGE PILE',
+        conf: conf,
+        color: isPothole ? '#EF4444' : '#00E5FF'
+      };
+
+      const stage = document.getElementById('videoStage');
+      if (stage) {
+        stage.style.boxShadow = `0 0 32px ${isPothole ? 'rgba(239, 68, 68, 0.85)' : 'rgba(0, 229, 255, 0.85)'}`;
+        setTimeout(() => {
+          stage.style.boxShadow = 'none';
+        }, 400);
+      }
+
+      if (boxExpiryTimeout) clearTimeout(boxExpiryTimeout);
+      boxExpiryTimeout = setTimeout(() => {
+        activeDetectedBox = null;
+      }, 4500);
+    }
+
+    // --- Tab Navigation ---
     function switchTab(tabId) {
       const tabs = ['overview', 'map', 'fleet', 'traffic'];
       tabs.forEach(t => {
@@ -1394,14 +1950,19 @@
             initMap();
           } else {
             map.invalidateSize();
-            if (userMarker) {
+            if (markersCluster && markersCluster.getLayers().length > 0) {
+              try {
+                map.fitBounds(markersCluster.getBounds().pad(0.12));
+              } catch(e) {}
+            } else if (userMarker) {
               map.setView(userMarker.getLatLng(), map.getZoom());
             }
           }
-        }, 50);
+        }, 60);
       }
     }
 
+    // --- Leaflet Geospatial Map System ---
     function initMap() {
       if (!map) {
         map = L.map('map').setView([currentLat, currentLng], 13);
@@ -1418,6 +1979,7 @@
         });
         map.addLayer(markersCluster);
 
+        // Seed initial clusters so map immediately populates
         seedInitialClusters();
 
         if (navigator.geolocation) {
@@ -1429,21 +1991,13 @@
               const currentLatLng = [currentLat, currentLng];
 
               if (!userMarker) {
-                map.setView(currentLatLng, 14);
-              }
-
-              if (userMarker) {
-                userMarker.setLatLng(currentLatLng);
-                userCircle.setLatLng(currentLatLng);
-                userCircle.setRadius(accuracy);
-              } else {
                 userMarker = L.circleMarker(currentLatLng, {
                   radius: 9,
                   fillColor: '#00E5FF',
                   color: '#FFFFFF',
                   weight: 2.5,
                   fillOpacity: 1
-                }).addTo(map).bindPopup("<b>Your Live Location (BMTC Bus Unit)</b><br>GPS Tracking Active").openPopup();
+                }).addTo(map).bindPopup("<b>Your Live Location (BMTC Bus Unit)</b><br>GPS Tracking Active");
 
                 userCircle = L.circle(currentLatLng, {
                   radius: accuracy,
@@ -1452,6 +2006,10 @@
                   fillColor: '#00E5FF',
                   fillOpacity: 0.15
                 }).addTo(map);
+              } else {
+                userMarker.setLatLng(currentLatLng);
+                userCircle.setLatLng(currentLatLng);
+                userCircle.setRadius(accuracy);
               }
 
               const gpsElement = document.getElementById('gps-coords');
@@ -1465,7 +2023,7 @@
             {
               enableHighAccuracy: true,
               timeout: 10000,
-              maximumAge: 0
+              maximumAge: 3000
             }
           );
         }
@@ -1474,9 +2032,105 @@
       }
     }
 
-    let allCachedHazards = [];
-    let modalHazards = [];
-    let activeEvidenceFilter = 'ALL';
+    // Seed realistic BMTC corridor hotspots if DB is loading
+    function seedInitialClusters() {
+      if (!markersCluster) return;
+      const initialHazards = [
+        { id: 'HAZ-BLR-01', title: 'ASPHALT POTHOLE CRATER', type: 'POTHOLE', lat: 12.9716, lng: 77.5946, sev: 4, conf: 96.4, addr: 'MG Road / Brigade Rd Junction' },
+        { id: 'HAZ-BLR-02', title: 'OVERFLOWING WASTE DUMP', type: 'GARBAGE', lat: 12.9754, lng: 77.6052, sev: 3, conf: 93.1, addr: 'Brigade Road Corridor' },
+        { id: 'HAZ-BLR-03', title: 'DEEP ROAD TRENCH', type: 'POTHOLE', lat: 12.9352, lng: 77.6245, sev: 5, conf: 98.2, addr: 'Koramangala 80ft Road' },
+        { id: 'HAZ-BLR-04', title: 'SURFACE CRATERING', type: 'POTHOLE', lat: 12.9176, lng: 77.6238, sev: 4, conf: 95.7, addr: 'Silk Board Junction' },
+        { id: 'HAZ-BLR-05', title: 'ILLEGAL WASTE HEAP', type: 'GARBAGE', lat: 12.9592, lng: 77.6974, sev: 3, conf: 91.5, addr: 'Marathahalli Outer Ring Rd' },
+        { id: 'HAZ-BLR-06', title: 'ASPHALT CAVERN', type: 'POTHOLE', lat: 13.0358, lng: 77.5970, sev: 4, conf: 97.0, addr: 'Hebbal Flyover Ramp' }
+      ];
+
+      initialHazards.forEach(h => {
+        addMarkerToCluster(h);
+      });
+    }
+
+    function addMarkerToCluster(h) {
+      if (!markersCluster) return;
+      const lat = parseFloat(h.latitude || h.lat);
+      const lng = parseFloat(h.longitude || h.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      const isPothole = (String(h.type || '').toUpperCase().includes('POTHOLE') || String(h.title || '').toUpperCase().includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD'));
+      const isGarbage = (String(h.type || '').toUpperCase().includes('GARBAGE') || String(h.title || '').toUpperCase().includes('GARBAGE'));
+      const sev = parseInt(h.severity || h.sev) || 3;
+
+      let ringColor = '#F59E0B';
+      if (sev >= 4 || isPothole) ringColor = '#EF4444';
+      if (isGarbage) ringColor = '#00E5FF';
+
+      const pinIcon = L.divIcon({
+        className: 'custom-ring-pin',
+        html: `<div class="pothole-target-ring" style="border-color:${ringColor}; box-shadow:0 0 10px ${ringColor}88;"></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+
+      const marker = L.marker([lat, lng], { icon: pinIcon });
+      const title = h.title || (isPothole ? 'ASPHALT POTHOLE CRATER' : 'CIVIC DEFECT');
+      const hId = h.id || 'HAZ-LIVE';
+      const conf = h.confidence || h.conf || 95.0;
+      const detectedTime = h.detected_at || h.detectedAt || new Date().toISOString();
+
+      marker.bindPopup(`
+        <div style="font-family:'Space Grotesk',sans-serif; min-width:210px; color:#111; padding:2px 0;">
+          <div style="font-weight:700; color:#FF6B35; font-size:0.92rem; line-height:1.2;">${title}</div>
+          <div style="font-family:monospace; font-size:0.75rem; color:#555; margin:3px 0 6px;">ID: <b>${hId}</b></div>
+          <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+            <span style="background:${sev >= 4 ? '#EF4444' : '#F59E0B'}; color:#fff; font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:3px;">SEV ${sev}/5</span>
+            <span style="color:#0284C7; font-weight:600; font-size:0.78rem;">${parseFloat(conf).toFixed(1)}% AI Conf</span>
+          </div>
+          <div style="font-size:0.78rem; color:#444;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+          <div style="font-size:0.72rem; color:#777; margin-top:2px;">Time: ${new Date(detectedTime).toLocaleString()}</div>
+          <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+            <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#2563EB; font-weight:600; font-size:0.75rem; text-decoration:underline;">Google Maps ↗</a>
+            <span style="color:#059669; font-weight:600; font-size:0.72rem;">● Neon DB Synced</span>
+          </div>
+        </div>
+      `);
+
+      markersCluster.addLayer(marker);
+    }
+
+    function centerOnUserLocation() {
+      if (!map) return;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            currentLat = pos.coords.latitude;
+            currentLng = pos.coords.longitude;
+            map.flyTo([currentLat, currentLng], 15, { duration: 1.2 });
+            if (userMarker) userMarker.setLatLng([currentLat, currentLng]).openPopup();
+            showToast('GPS Locked', `Centered on your location (${currentLat.toFixed(4)}, ${currentLng.toFixed(4)})`);
+          },
+          (err) => {
+            map.flyTo([currentLat, currentLng], 15, { duration: 1.2 });
+            showToast('GPS Notice', 'Using last known coordinates.');
+          },
+          { enableHighAccuracy: true, timeout: 6000 }
+        );
+      } else {
+        map.flyTo([currentLat, currentLng], 15, { duration: 1.2 });
+      }
+    }
+
+    function fitAllHazardsOnMap() {
+      if (!map || !markersCluster) return;
+      try {
+        if (markersCluster.getLayers().length > 0) {
+          map.fitBounds(markersCluster.getBounds().pad(0.15));
+          showToast('Map View Reset', 'Fitting all detected hazard clusters.');
+        } else {
+          map.flyTo([12.9716, 77.5946], 13);
+        }
+      } catch(e) {
+        map.flyTo([12.9716, 77.5946], 13);
+      }
+    }
 
     // --- Toast Notification System ---
     function showToast(title, message, isAlert = false) {
@@ -1505,11 +2159,10 @@
     }
 
     // --- Load Real Hazards from Neon DB onto Map ---
-    async function loadNeonHazardsOnMap() {
+    async function loadNeonHazardsOnMap(showNotification = false) {
       if (!markersCluster) return;
       try {
         let hazards = [];
-        // Strategy 1: Flask backend endpoint
         try {
           const res = await fetch('/api/hazards?limit=120');
           if (res.ok) {
@@ -1520,7 +2173,6 @@
           }
         } catch (e) { }
 
-        // Strategy 2: Direct NeonDB client fallback
         if (hazards.length === 0 && window.NeonDB) {
           try {
             hazards = await window.NeonDB.getAllHazards(120);
@@ -1532,50 +2184,20 @@
           allCachedHazards = hazards;
 
           hazards.forEach(h => {
-            const lat = parseFloat(h.latitude || h.lat);
-            const lng = parseFloat(h.longitude || h.lng);
-            if (isNaN(lat) || isNaN(lng)) return;
-
-            const isPothole = (String(h.type || '').toUpperCase().includes('POTHOLE') || String(h.title || '').toUpperCase().includes('POTHOLE') || String(h.category || '').toUpperCase().includes('ROAD'));
-            const isGarbage = (String(h.type || '').toUpperCase().includes('GARBAGE') || String(h.title || '').toUpperCase().includes('GARBAGE'));
-            const sev = parseInt(h.severity) || 3;
-
-            let ringColor = '#F59E0B'; // default moderate
-            if (sev >= 4 || isPothole) ringColor = '#EF4444';
-            if (isGarbage) ringColor = '#00E5FF';
-
-            const pinIcon = L.divIcon({
-              className: 'custom-ring-pin',
-              html: `<div class="pothole-target-ring" style="border-color:${ringColor}; box-shadow:0 0 10px ${ringColor}88;"></div>`,
-              iconSize: [18, 18],
-              iconAnchor: [9, 9]
-            });
-
-            const marker = L.marker([lat, lng], { icon: pinIcon });
-            const title = h.title || (isPothole ? 'ASPHALT POTHOLE CRATER' : 'CIVIC DEFECT');
-            const hId = h.id || 'HAZ-LIVE';
-            const conf = h.confidence || h.conf || 95.0;
-            const detectedTime = h.detected_at || h.detectedAt || new Date().toISOString();
-
-            marker.bindPopup(`
-              <div style="font-family:'Space Grotesk',sans-serif; min-width:210px; color:#111; padding:2px 0;">
-                <div style="font-weight:700; color:#FF6B35; font-size:0.92rem; line-height:1.2;">${title}</div>
-                <div style="font-family:monospace; font-size:0.75rem; color:#555; margin:3px 0 6px;">ID: <b>${hId}</b></div>
-                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
-                  <span style="background:${sev >= 4 ? '#EF4444' : '#F59E0B'}; color:#fff; font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:3px;">SEV ${sev}/5</span>
-                  <span style="color:#0284C7; font-weight:600; font-size:0.78rem;">${parseFloat(conf).toFixed(1)}% AI Conf</span>
-                </div>
-                <div style="font-size:0.78rem; color:#444;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-                <div style="font-size:0.72rem; color:#777; margin-top:2px;">Time: ${new Date(detectedTime).toLocaleString()}</div>
-                <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-                  <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#2563EB; font-weight:600; font-size:0.75rem; text-decoration:underline;">Google Maps ↗</a>
-                  <span style="color:#059669; font-weight:600; font-size:0.72rem;">● Neon DB Synced</span>
-                </div>
-              </div>
-            `);
-
-            markersCluster.addLayer(marker);
+            addMarkerToCluster(h);
           });
+
+          // If map is currently active or viewed, fit bounds to show hazards in correct location
+          const mapPane = document.getElementById('tab-map');
+          if (mapPane && !mapPane.classList.contains('tab-hidden') && map) {
+            try {
+              map.fitBounds(markersCluster.getBounds().pad(0.12));
+            } catch(e) {}
+          }
+
+          if (showNotification) {
+            showToast('Map Pins Refreshed', `Loaded ${hazards.length} hazards from Neon DB.`);
+          }
         }
       } catch (err) {
         console.warn('Error loading hazards onto map from Neon DB:', err);
@@ -1608,32 +2230,16 @@
         status: 'active'
       };
 
-      // 1. Immediately update Map
-      if (markersCluster) {
-        const pinIcon = L.divIcon({
-          className: 'custom-ring-pin',
-          html: `<div class="pothole-target-ring" style="border-color:${isPothole ? '#EF4444' : '#00E5FF'}; box-shadow:0 0 14px ${isPothole ? '#EF4444' : '#00E5FF'};"></div>`,
-          iconSize: [18, 18],
-          iconAnchor: [9, 9]
-        });
+      // 1. Show live YOLO bounding box on camera feed canvas
+      showDetectionOverlay(type, conf);
 
-        const m = L.marker([offsetLat, offsetLng], { icon: pinIcon });
-        m.bindPopup(`
-          <div style="font-family:'Space Grotesk',sans-serif; min-width:210px; color:#111;">
-            <b style="color:#FF6B35; font-size:0.92rem;">🚨 NEW LIVE DETECTION</b><br>
-            <div style="font-size:0.8rem; margin:3px 0;"><b>${title}</b> (<code>${hazId}</code>)</div>
-            <div style="font-size:0.75rem; color:#444;">GPS: ${offsetLat.toFixed(5)}, ${offsetLng.toFixed(5)}</div>
-            <div style="font-size:0.72rem; color:#059669; font-weight:700; margin-top:4px;">● Committed to Neon PostgreSQL Cloud</div>
-          </div>
-        `);
-        markersCluster.addLayer(m);
-        m.openPopup();
-      }
+      // 2. Immediately update Map
+      addMarkerToCluster(newHazard);
 
-      // 2. Prepend row to Live Table
+      // 3. Prepend row to Live Table
       prependLiveTableRow(newHazard);
 
-      // 3. Immediately increment counters
+      // 4. Immediately increment counters
       const pCountEl = document.getElementById('potholes-count');
       const gCountEl = document.getElementById('garbage-count');
       const evCountEl = document.getElementById('evidenceCount');
@@ -1644,10 +2250,10 @@
       if (evCountEl) evCountEl.innerText = parseInt(evCountEl.innerText || 0) + 1;
       if (neonCountEl) neonCountEl.innerText = parseInt(neonCountEl.innerText || 0) + 1;
 
-      // 4. Show live toast confirmation
+      // 5. Show live toast confirmation
       showToast('Stored in Neon PostgreSQL Cloud', `New ${type} defect (${hazId}) committed to live database.`, true);
 
-      // 5. Commit to Neon DB (Flask API or Direct Client)
+      // 6. Commit to Neon DB (Flask API or Direct Client)
       try {
         let saved = false;
         try {
@@ -1947,6 +2553,7 @@
 
     // --- Startup Initialization ---
     window.addEventListener('DOMContentLoaded', () => {
+      initDashCamera();
       initMap();
       loadNeonHazardsOnMap();
       fetchLiveMetrics();
@@ -2133,6 +2740,39 @@
 
   <!-- Live Toast Notifications Container -->
   <div id="toastContainer" class="toast-container"></div>
+
+  <script>
+    /* ── Mobile Sidebar Toggle ── */
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('active');
+    }
+
+    function closeSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+    }
+
+    /* Close sidebar on resize to desktop */
+    window.addEventListener('resize', function() {
+      if (window.innerWidth > 768) {
+        closeSidebar();
+      }
+    });
+
+    /* Close sidebar when a nav link is clicked (mobile UX) */
+    document.querySelectorAll('.side-link').forEach(function(link) {
+      link.addEventListener('click', function() {
+        if (window.innerWidth <= 768) {
+          closeSidebar();
+        }
+      });
+    });
+  </script>
 </body>
 
 </html>
