@@ -479,6 +479,8 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 @app.route("/login.html", methods=["GET", "POST"])
+@app.route("/register", methods=["GET", "POST"])
+@app.route("/register.html", methods=["GET", "POST"])
 @app.route("/api/login", methods=["GET", "POST"])
 @app.route("/api/index/login", methods=["GET", "POST"])
 def login():
@@ -846,6 +848,76 @@ def serve_static_asset(filename):
             if os.path.isfile(sub_path):
                 return send_file(sub_path)
     return "Not Found", 404
+
+class VercelPathMiddleware:
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        resolved_path = None
+        qs = environ.get("QUERY_STRING", "")
+        if qs and ("path=" in qs or "__path__=" in qs):
+            try:
+                params = urllib.parse.parse_qs(qs)
+                raw = params.get("path", [""])[0] or params.get("__path__", [""])[0]
+                clean = urllib.parse.unquote(raw).split("?")[0].strip()
+                if clean and not any(ch in clean for ch in ("$", "(", ")", "*")):
+                    resolved_path = "/" + clean.lstrip("/")
+                elif clean == "" or clean == "/":
+                    resolved_path = "/"
+
+                modified = False
+                if "path" in params:
+                    del params["path"]
+                    modified = True
+                if "__path__" in params:
+                    del params["__path__"]
+                    modified = True
+                if modified:
+                    environ["QUERY_STRING"] = urllib.parse.urlencode(params, doseq=True)
+            except Exception:
+                pass
+
+        if not resolved_path:
+            for h in (
+                "HTTP_X_FORWARDED_PATH",
+                "HTTP_X_FORWARDED_URI",
+                "HTTP_X_MATCHED_PATH",
+                "RAW_URI",
+                "REQUEST_URI",
+            ):
+                val = environ.get(h, "")
+                if (
+                    val
+                    and not val.startswith("/api/index")
+                    and not any(ch in val for ch in ("$", "(", ")", "*"))
+                ):
+                    resolved_path = "/" + val.split("?")[0].lstrip("/")
+                    break
+
+        if not resolved_path:
+            route_matches = environ.get("HTTP_X_NOW_ROUTE_MATCHES", "")
+            if route_matches:
+                try:
+                    params = urllib.parse.parse_qs(route_matches)
+                    match_val = params.get("1", [""])[0] or params.get("path", [""])[0]
+                    if match_val and not any(ch in match_val for ch in ("$", "(", ")", "*")):
+                        resolved_path = "/" + match_val.split("?")[0].lstrip("/")
+                except Exception:
+                    pass
+
+        if resolved_path:
+            environ["PATH_INFO"] = resolved_path
+        else:
+            path_info = environ.get("PATH_INFO", "")
+            if path_info in ("/api/index", "/api/index.py", "/api/", "/api", ""):
+                environ["PATH_INFO"] = "/"
+
+        return self.wsgi_app(environ, start_response)
+
+if not getattr(app, "_vercel_middleware_applied", False):
+    app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
+    app._vercel_middleware_applied = True
 
 if __name__ == "__main__":
     log = logging.getLogger("werkzeug")

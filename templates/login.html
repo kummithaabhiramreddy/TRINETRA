@@ -393,12 +393,12 @@
 
   <div class="wrap">
     <div class="top-logo">
-      <a class="wordmark">TR<span class="gate-i"><span class="gate-frame"></span><span class="gate-stem"></span><svg
+      <a class="wordmark" href="/">TR<span class="gate-i"><span class="gate-frame"></span><span class="gate-stem"></span><svg
             class="gate-star" viewBox="0 0 24 24" fill="none">
             <path d="M12 1V23M2.5 6.2L21.5 17.8M21.5 6.2L2.5 17.8" stroke="#FF7A45" stroke-width="2"
               stroke-linecap="round" />
           </svg></span>NETRA</a>
-      <a class="back-link" href="index.html">← Back to home</a>
+      <a class="back-link" href="/">← Back to home</a>
     </div>
 
     <h1 class="hero-h">The eye the city<br>didn't have</h1>
@@ -465,7 +465,7 @@
       </div>
     </div>
 
-    <div class="switch-row"><a href="forgot-password.html">Forgot password?</a></div>
+    <div class="switch-row"><a href="/forgot-password.html">Forgot password?</a></div>
   </div>
 
   <script src="/assets/js/neon-db.js"></script>
@@ -473,7 +473,7 @@
   <script>
     (function () {
       var urlParams = new URLSearchParams(window.location.search);
-      var redirectTarget = urlParams.get('redirect') || 'dashboard.html';
+      var redirectTarget = urlParams.get('redirect') || '/dashboard.html';
       var reason = urlParams.get('reason');
 
       window.GOOGLE_CLIENT_ID = '587514151509-ffmej4mml0re8ascku86u2tnlb09tbnm.apps.googleusercontent.com';
@@ -491,7 +491,7 @@
 
         if (isPwError) {
           var a = document.createElement('a');
-          a.href = 'forgot-password.html';
+          a.href = '/forgot-password.html';
           a.textContent = ' Forgot Password? →';
           a.style.cssText = 'color:#fff; font-weight:700; text-decoration:underline; margin-left:8px; cursor:pointer;';
           banner.appendChild(a);

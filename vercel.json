@@ -1,9 +1,10 @@
 {
   "version": 2,
+  "cleanUrls": false,
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.py"
+      "source": "/:path*",
+      "destination": "/api/index.py?path=:path*"
     }
   ]
 }
