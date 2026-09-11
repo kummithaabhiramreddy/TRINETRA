@@ -125,6 +125,13 @@ def execute_neon_query(query, params=None, array_mode=False):
             )
             with urllib.request.urlopen(neon_req, timeout=12) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as he:
+            err_body = he.read().decode("utf-8", errors="ignore")
+            print(f"Neon HTTP Error {he.code}: {err_body}")
+            try:
+                return json.loads(err_body)
+            except Exception:
+                return {"message": err_body}
         except Exception as e:
             if attempt == 2:
                 print(f"Neon Query Error (attempt {attempt + 1}): {e}")
@@ -707,35 +714,27 @@ def proxy_neon_sql():
     if request.method == "OPTIONS":
         res = Response()
         res.headers["Access-Control-Allow-Origin"] = "*"
-        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Neon-Connection-String"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Neon-Connection-String, Neon-Raw-Text-Output, Neon-Array-Mode"
         res.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
         return res
 
     try:
         data = request.get_json(force=True, silent=True) or {}
-        neon_conn = "postgresql://neondb_owner:npg_kCrMU0l9LViJ@ep-rapid-sunset-a54uayxa-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-        neon_endpoint = "https://ep-rapid-sunset-a54uayxa.us-east-2.aws.neon.tech/sql"
-        
-        req_data = json.dumps(data).encode("utf-8")
-        neon_req = urllib.request.Request(
-            neon_endpoint,
-            data=req_data,
-            headers={
-                "Neon-Connection-String": neon_conn,
-                "Content-Type": "application/json",
-                "Neon-Raw-Text-Output": "true",
-                "Neon-Array-Mode": "true"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(neon_req, timeout=10) as resp:
-            resp_body = resp.read()
-            flask_res = Response(resp_body, status=resp.status, mimetype="application/json")
+        query = data.get("query", "").strip()
+        params = data.get("params", [])
+
+        if not query:
+            flask_res = jsonify({"error": "No query provided"})
             flask_res.headers["Access-Control-Allow-Origin"] = "*"
-            return flask_res
-    except urllib.error.HTTPError as he:
-        err_body = he.read().decode("utf-8", errors="ignore")
-        flask_res = Response(err_body, status=he.code, mimetype="application/json")
+            return flask_res, 400
+
+        res_data = execute_neon_query(query, params, array_mode=True)
+        if res_data is None:
+            flask_res = jsonify({"message": "Neon database query failed"})
+            flask_res.headers["Access-Control-Allow-Origin"] = "*"
+            return flask_res, 502
+
+        flask_res = jsonify(res_data)
         flask_res.headers["Access-Control-Allow-Origin"] = "*"
         return flask_res
     except Exception as e:

@@ -24,7 +24,19 @@
       role: 'Chief Traffic Controller',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
       provider: 'email',
-      password_hash: 'Thrinethra2026!'
+      password_hash: 'Trinetra2026!'
+    },
+    {
+      id: 'usr_admin_002',
+      first_name: 'Trinetra',
+      last_name: 'Admin',
+      name: 'Trinetra Admin',
+      email: 'admin@trinetra.gov',
+      org: 'Bengaluru Metropolitan Transport Corp. (BMTC)',
+      role: 'Chief Traffic Controller',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
+      provider: 'email',
+      password_hash: 'Trinetra2026!'
     },
     {
       id: 'usr_demo_002',
@@ -46,6 +58,7 @@
       this.connectionString = NEON_CONFIG.connectionString;
       this._initialized = false;
       this._initPromise = null;
+      this._directBlocked = false;
     }
 
     async _getProxyEndpoint() {
@@ -82,21 +95,30 @@
         // Note: Do NOT include 'Content-Type: application/json' because Neon's CORS
         // Access-Control-Allow-Headers explicitly permits Neon-*, but omitting Content-Type
         // ensures browser CORS preflight passes cleanly.
-        try {
-          const directRes = await fetch(this.endpoint, {
-            method: 'POST',
-            headers: {
-              'Neon-Connection-String': this.connectionString,
-              'Neon-Raw-Text-Output': 'true',
-              'Neon-Array-Mode': 'true'
-            },
-            body: JSON.stringify(body)
-          });
-          if (directRes.ok) {
-            response = directRes;
+        if (!this._directBlocked) {
+          try {
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+            const directRes = await fetch(this.endpoint, {
+              method: 'POST',
+              signal: controller ? controller.signal : undefined,
+              headers: {
+                'Neon-Connection-String': this.connectionString,
+                'Neon-Raw-Text-Output': 'true',
+                'Neon-Array-Mode': 'true'
+              },
+              body: JSON.stringify(body)
+            });
+            if (timeoutId) clearTimeout(timeoutId);
+            if (directRes && directRes.ok) {
+              response = directRes;
+            } else {
+              this._directBlocked = true;
+            }
+          } catch (directErr) {
+            this._directBlocked = true;
+            console.warn('Direct Neon connection warning, falling back to local proxy:', directErr.message);
           }
-        } catch (directErr) {
-          console.warn('Direct Neon connection warning:', directErr.message);
         }
 
         // Strategy 2: If direct Neon was blocked (e.g. strict firewall), use local server proxy
@@ -266,8 +288,8 @@
           // Seed default authority demo accounts if not already present
           for (const u of SEED_USERS) {
             const existing = await this.query(
-              `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`,
-              [u.email]
+              `SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1;`,
+              [u.email.toLowerCase()]
             );
             if (existing.length === 0) {
               await this.query(
@@ -299,30 +321,44 @@
       const cleanEmail = (email || '').trim().toLowerCase();
       if (!cleanEmail) return null;
 
-      const rows = await this.query(
-        `SELECT id, first_name, last_name, name, email, org, role, avatar, provider, password_hash, created_at, last_login 
-         FROM users 
-         WHERE LOWER(email) = LOWER($1) 
-         LIMIT 1;`,
-        [cleanEmail]
-      );
+      // Support common authority aliases (trinetra / thrinethra)
+      const emailsToCheck = [cleanEmail];
+      if (cleanEmail === 'admin@trinetra.gov') emailsToCheck.push('admin@thrinethra.gov');
+      if (cleanEmail === 'admin@thrinethra.gov') emailsToCheck.push('admin@trinetra.gov');
 
-      if (rows.length === 0) return null;
-      const r = rows[0];
-      return {
-        id: r.id,
-        firstName: r.first_name,
-        lastName: r.last_name,
-        name: r.name,
-        email: r.email,
-        org: r.org,
-        role: r.role,
-        avatar: r.avatar,
-        provider: r.provider,
-        passwordHash: r.password_hash,
-        createdAt: r.created_at,
-        lastLogin: r.last_login
-      };
+      for (const targetEmail of emailsToCheck) {
+        try {
+          const rows = await this.query(
+            `SELECT id, first_name, last_name, name, email, org, role, avatar, provider, password_hash, created_at, last_login 
+             FROM users 
+             WHERE LOWER(email) = $1 
+             LIMIT 1;`,
+            [targetEmail]
+          );
+
+          if (rows && rows.length > 0) {
+            const r = rows[0];
+            return {
+              id: r.id,
+              firstName: r.first_name,
+              lastName: r.last_name,
+              name: r.name,
+              email: r.email,
+              org: r.org,
+              role: r.role,
+              avatar: r.avatar,
+              provider: r.provider,
+              passwordHash: r.password_hash,
+              createdAt: r.created_at,
+              lastLogin: r.last_login
+            };
+          }
+        } catch (err) {
+          console.warn('findUserByEmail query error for', targetEmail, err);
+        }
+      }
+
+      return null;
     }
 
     async createUser(u) {
@@ -373,7 +409,7 @@
       const user = await this.findUserByEmail(cleanEmail);
       if (!user) throw new Error('No registered account found with email ' + cleanEmail);
 
-      await this.query(`UPDATE users SET password_hash = $1 WHERE LOWER(email) = LOWER($2);`, [newPassword, cleanEmail]);
+      await this.query(`UPDATE users SET password_hash = $1 WHERE LOWER(email) = $2;`, [newPassword, cleanEmail]);
       return true;
     }
 

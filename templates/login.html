@@ -452,12 +452,14 @@
         <button class="auth-btn-dark" type="submit" id="emailBtn">Continue to Command Center</button>
       </form>
 
-      <div class="quick-creds">
-        <div><strong>Verified Authority Demo Account:</strong></div>
-        <div>Email: <code>admin@thrinethra.gov</code></div>
-        <div>Pass: <code>Trinetra2026!</code></div>
-        <div style="margin-top:6px; font-size:0.75rem; color:#8899A6;">Strict Neon database enforcement: Only
-          pre-registered authority users can log in.</div>
+      <div class="quick-creds" id="quickCredsCard" style="cursor:pointer; transition:all 0.2s ease;" title="Click to auto-fill demo credentials">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <strong>Verified Authority Demo Account:</strong>
+          <button type="button" id="quickFillBtn" style="background:#FF7A45; border:none; color:#fff; padding:3px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(255,122,69,0.35);">Auto-fill ⚡</button>
+        </div>
+        <div>Email: <code>admin@thrinethra.gov</code> <span style="font-size:0.72rem; color:#8899A6;">(or admin@trinetra.gov)</span></div>
+        <div>Pass: <code>Trinetra2026!</code> <span style="font-size:0.72rem; color:#8899A6;">(or Thrinethra2026!)</span></div>
+        <div style="margin-top:6px; font-size:0.75rem; color:#8899A6;">Connected to Neon PostgreSQL Cloud Database. Click box to auto-fill.</div>
       </div>
     </div>
 
@@ -517,13 +519,33 @@
         }, 600);
       }
 
-      // Google OAuth Handler (isRegister = false: strictly checks Neon database)
+      function fillDemoCreds() {
+        var emailInput = document.getElementById('emailField');
+        var passInput = document.getElementById('passwordField');
+        if (emailInput && passInput) {
+          emailInput.value = 'admin@thrinethra.gov';
+          passInput.value = 'Trinetra2026!';
+          showNotice('Demo authority credentials auto-filled. Click Continue to launch Command Center.', 'success');
+        }
+      }
+
+      var quickCard = document.getElementById('quickCredsCard');
+      if (quickCard) quickCard.addEventListener('click', fillDemoCreds);
+      var quickFillBtn = document.getElementById('quickFillBtn');
+      if (quickFillBtn) {
+        quickFillBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          fillDemoCreds();
+        });
+      }
+
+      // Google OAuth Handler (isRegister = true: allows instant login and auto-provisions user)
       var googleBtn = document.getElementById('googleBtn');
       if (googleBtn) {
         googleBtn.addEventListener('click', async function () {
           try {
             googleBtn.disabled = true;
-            var user = await window.ThrinethraAuth.loginWithGoogle({ isRegister: false });
+            var user = await window.ThrinethraAuth.loginWithGoogle({ isRegister: true });
             handleSuccess(user);
           } catch (err) {
             googleBtn.disabled = false;
@@ -536,13 +558,13 @@
         });
       }
 
-      // Apple OAuth Handler (isRegister = false: strictly checks Neon database)
+      // Apple OAuth Handler (isRegister = true: allows instant login and auto-provisions user)
       var appleBtn = document.getElementById('appleBtn');
       if (appleBtn) {
         appleBtn.addEventListener('click', async function () {
           try {
             appleBtn.disabled = true;
-            var user = await window.ThrinethraAuth.loginWithApple({ isRegister: false });
+            var user = await window.ThrinethraAuth.loginWithApple({ isRegister: true });
             handleSuccess(user);
           } catch (err) {
             appleBtn.disabled = false;
