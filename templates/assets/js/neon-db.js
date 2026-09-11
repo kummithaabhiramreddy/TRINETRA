@@ -59,6 +59,23 @@
       this._initialized = false;
       this._initPromise = null;
       this._directBlocked = false;
+      this._directBlockedUntil = 0;
+      this._syncServerConfig();
+    }
+
+    async _syncServerConfig() {
+      if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+        try {
+          const res = await fetch('/api/neon-config');
+          if (res.ok) {
+            const cfg = await res.json();
+            if (cfg.sqlEndpoint) this.endpoint = cfg.sqlEndpoint;
+            if (cfg.connectionString) this.connectionString = cfg.connectionString;
+          }
+        } catch (e) {
+          // Keep defaults
+        }
+      }
     }
 
     async _getProxyEndpoint() {
@@ -91,14 +108,17 @@
       try {
         let response = null;
 
+        // Reset temporary block if 30 seconds have passed
+        if (this._directBlocked && Date.now() > this._directBlockedUntil) {
+          this._directBlocked = false;
+        }
+
         // Strategy 1: Direct Neon Serverless HTTP API over HTTPS
-        // Note: Do NOT include 'Content-Type: application/json' because Neon's CORS
-        // Access-Control-Allow-Headers explicitly permits Neon-*, but omitting Content-Type
-        // ensures browser CORS preflight passes cleanly.
+        // Timeout set to 6000ms to allow serverless compute cold starts (1.5-3.5s)
         if (!this._directBlocked) {
           try {
             const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-            const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+            const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
             const directRes = await fetch(this.endpoint, {
               method: 'POST',
               signal: controller ? controller.signal : undefined,
@@ -114,14 +134,16 @@
               response = directRes;
             } else {
               this._directBlocked = true;
+              this._directBlockedUntil = Date.now() + 30000;
             }
           } catch (directErr) {
             this._directBlocked = true;
-            console.warn('Direct Neon connection warning, falling back to local proxy:', directErr.message);
+            this._directBlockedUntil = Date.now() + 30000;
+            console.warn('Direct Neon connection warning, falling back to server proxy:', directErr.message);
           }
         }
 
-        // Strategy 2: If direct Neon was blocked (e.g. strict firewall), use local server proxy
+        // Strategy 2: If direct Neon was blocked or timed out, use serverless proxy /api/neon-sql
         if (!response) {
           const proxy = await this._getProxyEndpoint();
           if (proxy) {
@@ -138,20 +160,23 @@
           }
         }
 
-        // Strategy 3: Try explicit localhost ports (Flask 5000 / Node 3000)
+        // Strategy 3: Try explicit localhost ports only when running in a local browser
         if (!response && typeof window !== 'undefined') {
-          for (const localHostUrl of ['http://localhost:5000/api/neon-sql', 'http://127.0.0.1:5000/api/neon-sql', 'http://localhost:3000/api/neon-sql']) {
-            try {
-              const localRes = await fetch(localHostUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-              });
-              if (localRes.ok) {
-                response = localRes;
-                break;
-              }
-            } catch (localErr) {}
+          const isLocal = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
+          if (isLocal) {
+            for (const localHostUrl of ['http://localhost:5000/api/neon-sql', 'http://127.0.0.1:5000/api/neon-sql', 'http://localhost:3000/api/neon-sql']) {
+              try {
+                const localRes = await fetch(localHostUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body)
+                });
+                if (localRes.ok) {
+                  response = localRes;
+                  break;
+                }
+              } catch (localErr) {}
+            }
           }
         }
 

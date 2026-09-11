@@ -96,9 +96,26 @@ def _resilient_getaddrinfo(host, port, *args, **kwargs):
 
 socket.getaddrinfo = _resilient_getaddrinfo
 
-# Neon Database Configuration
-NEON_CONN_STRING = "postgresql://neondb_owner:npg_kCrMU0l9LViJ@ep-rapid-sunset-a54uayxa-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-NEON_SQL_ENDPOINT = "https://ep-rapid-sunset-a54uayxa.us-east-2.aws.neon.tech/sql"
+# Neon Database Configuration (supports Vercel env vars like DATABASE_URL or POSTGRES_URL)
+NEON_CONN_STRING = (
+    os.environ.get("DATABASE_URL")
+    or os.environ.get("NEON_DATABASE_URL")
+    or os.environ.get("POSTGRES_URL")
+    or os.environ.get("NEON_CONN_STRING")
+    or "postgresql://neondb_owner:npg_kCrMU0l9LViJ@ep-rapid-sunset-a54uayxa-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+)
+
+def _derive_neon_sql_endpoint(conn_str):
+    try:
+        parsed = urllib.parse.urlparse(conn_str)
+        if parsed.hostname and ("neon.tech" in parsed.hostname or "aws.neon" in parsed.hostname):
+            base_host = parsed.hostname.replace("-pooler", "")
+            return f"https://{base_host}/sql"
+    except Exception:
+        pass
+    return "https://ep-rapid-sunset-a54uayxa.us-east-2.aws.neon.tech/sql"
+
+NEON_SQL_ENDPOINT = os.environ.get("NEON_SQL_ENDPOINT") or _derive_neon_sql_endpoint(NEON_CONN_STRING)
 
 def execute_neon_query(query, params=None, array_mode=False):
     """Execute raw SQL query over Neon serverless HTTP endpoint with automatic DNS fallback and retries."""
@@ -533,13 +550,15 @@ def get_metrics():
         res = execute_neon_query(query)
         if res and res.get("rows"):
             r = res["rows"][0]
-            return jsonify({
+            flask_res = jsonify({
                 "total": int(r.get("total") or 0),
                 "potholes": int(r.get("potholes") or 0),
                 "garbage": int(r.get("garbage") or 0),
                 "critical": int(r.get("critical") or 0),
                 "source": "neon_database"
             })
+            flask_res.headers["Access-Control-Allow-Origin"] = "*"
+            return flask_res
     except Exception as e:
         print(f"Error reading metrics from Neon DB: {e}")
 
@@ -555,13 +574,15 @@ def get_metrics():
         except Exception as e:
             print(f"Error reading CSV: {e}")
 
-    return jsonify({
+    flask_res = jsonify({
         "total": BASE_POTHOLES + pothole_detected + BASE_GARBAGE + garbage_detected,
         "potholes": BASE_POTHOLES + pothole_detected,
         "garbage": BASE_GARBAGE + garbage_detected,
         "critical": 0,
         "source": "local_csv_fallback"
     })
+    flask_res.headers["Access-Control-Allow-Origin"] = "*"
+    return flask_res
 
 @app.route("/api/hazards", methods=["GET", "POST", "OPTIONS"])
 def handle_hazards():
@@ -648,26 +669,73 @@ def handle_hazards():
     flask_res.headers["Access-Control-Allow-Origin"] = "*"
     return flask_res
 
+@app.route("/api/neon-config")
+def get_neon_config():
+    """Expose Neon SQL endpoint and connection configuration to frontend clients."""
+    res = jsonify({
+        "sqlEndpoint": NEON_SQL_ENDPOINT,
+        "connectionString": NEON_CONN_STRING
+    })
+    res.headers["Access-Control-Allow-Origin"] = "*"
+    return res
+
 @app.route("/api/logs")
 def get_logs():
+    """Return hazard logs from CSV if available, or fall back to live Neon DB query."""
     if os.path.exists(LOG_FILE):
         try:
             with open(LOG_FILE, "r", encoding="utf-8", errors="ignore") as f:
                 reader = list(csv.DictReader(f))
-                total = len(reader)
-                potholes = sum(1 for r in reader if str(r.get("Hazard_Type", "")).upper() == "POTHOLE")
-                garbage = sum(1 for r in reader if "GARBAGE" in str(r.get("Hazard_Type", "")).upper())
-                critical = sum(1 for r in reader if str(r.get("Severity", "")).upper() == "CRITICAL")
-                return jsonify({
-                    "total_count": total,
-                    "pothole_count": potholes,
-                    "garbage_count": garbage,
-                    "critical_count": critical,
-                    "logs": reader[-15:]
-                })
+                if reader:
+                    total = len(reader)
+                    potholes = sum(1 for r in reader if str(r.get("Hazard_Type", "")).upper() == "POTHOLE")
+                    garbage = sum(1 for r in reader if "GARBAGE" in str(r.get("Hazard_Type", "")).upper())
+                    critical = sum(1 for r in reader if str(r.get("Severity", "")).upper() == "CRITICAL")
+                    flask_res = jsonify({
+                        "total_count": total,
+                        "pothole_count": potholes,
+                        "garbage_count": garbage,
+                        "critical_count": critical,
+                        "logs": reader[-15:],
+                        "source": "local_csv"
+                    })
+                    flask_res.headers["Access-Control-Allow-Origin"] = "*"
+                    return flask_res
         except Exception as e:
             print(f"Error reading CSV: {e}")
-    return jsonify({"total_count": 0, "pothole_count": 0, "garbage_count": 0, "critical_count": 0, "logs": []})
+
+    # Fallback to querying live Neon database (critical for serverless Vercel runtime)
+    try:
+        query = """
+        SELECT detected_at as "Timestamp", type as "Hazard_Type", severity as "Severity",
+               confidence as "Confidence", latitude as "Latitude", longitude as "Longitude"
+        FROM hazards
+        ORDER BY detected_at DESC
+        LIMIT 15;
+        """
+        res = execute_neon_query(query)
+        if res and res.get("rows"):
+            rows = res["rows"]
+            total = len(rows)
+            potholes = sum(1 for r in rows if "POTHOLE" in str(r.get("Hazard_Type", "")).upper())
+            garbage = sum(1 for r in rows if "GARBAGE" in str(r.get("Hazard_Type", "")).upper())
+            critical = sum(1 for r in rows if int(r.get("Severity") or 0) >= 4)
+            flask_res = jsonify({
+                "total_count": total,
+                "pothole_count": potholes,
+                "garbage_count": garbage,
+                "critical_count": critical,
+                "logs": rows,
+                "source": "neon_database"
+            })
+            flask_res.headers["Access-Control-Allow-Origin"] = "*"
+            return flask_res
+    except Exception as err:
+        print(f"Error querying logs from Neon DB: {err}")
+
+    flask_res = jsonify({"total_count": 0, "pothole_count": 0, "garbage_count": 0, "critical_count": 0, "logs": [], "source": "none"})
+    flask_res.headers["Access-Control-Allow-Origin"] = "*"
+    return flask_res
 
 @app.route("/download/csv")
 def download_csv():
@@ -778,48 +846,6 @@ def serve_static_asset(filename):
             if os.path.isfile(sub_path):
                 return send_file(sub_path)
     return "Not Found", 404
-
-class VercelPathMiddleware:
-    def __init__(self, wsgi_app):
-        self.wsgi_app = wsgi_app
-
-    def __call__(self, environ, start_response):
-        resolved_path = None
-        for uri_key in ("RAW_URI", "REQUEST_URI", "QUERY_STRING"):
-            uri_val = environ.get(uri_key, "")
-            if uri_val and "__path__=" in uri_val:
-                m = re.search(r"[?&]__path__=([^&]+)", uri_val)
-                if m:
-                    clean = urllib.parse.unquote(m.group(1)).split("?")[0]
-                    resolved_path = "/" + clean.lstrip("/")
-                    break
-
-        qs = environ.get("QUERY_STRING", "")
-        if qs:
-            params = urllib.parse.parse_qs(qs)
-            if not resolved_path and "__path__" in params and params["__path__"]:
-                resolved_path = "/" + params["__path__"][0].lstrip("/")
-            if "__path__" in params:
-                del params["__path__"]
-                environ["QUERY_STRING"] = urllib.parse.urlencode(params, doseq=True)
-
-        if not resolved_path:
-            for h in ("HTTP_X_FORWARDED_PATH", "HTTP_X_MATCHED_PATH", "HTTP_X_FORWARDED_URI"):
-                val = environ.get(h, "")
-                if val and not val.startswith("/api/index"):
-                    resolved_path = "/" + val.split("?")[0].lstrip("/")
-                    break
-
-        if resolved_path:
-            environ["PATH_INFO"] = resolved_path
-        else:
-            path_info = environ.get("PATH_INFO", "")
-            if path_info in ("/api/index", "/api/index.py", "/api/", "/api"):
-                environ["PATH_INFO"] = "/"
-
-        return self.wsgi_app(environ, start_response)
-
-app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
 
 if __name__ == "__main__":
     log = logging.getLogger("werkzeug")

@@ -14,55 +14,58 @@ import urllib.parse
 class VercelPathMiddleware:
     """
     Ensures that when Vercel rewrites requests to /api/index.py,
-    Flask receives the real requested URL path (e.g. /, /dashboard, /login, /api/metrics).
+    Flask receives the real requested URL path (e.g. /, /dashboard, /login, /api/metrics, /api/hazards).
     """
     def __init__(self, wsgi_app):
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        # 1. Search for __path__ in RAW_URI, REQUEST_URI, or QUERY_STRING
         resolved_path = None
-        for uri_key in ("RAW_URI", "REQUEST_URI", "QUERY_STRING"):
-            uri_val = environ.get(uri_key, "")
-            if uri_val and "__path__=" in uri_val:
-                m = re.search(r"[?&]__path__=([^&]+)", uri_val)
-                if m:
-                    clean = urllib.parse.unquote(m.group(1)).split("?")[0]
-                    resolved_path = "/" + clean.lstrip("/")
-                    break
 
-        # 2. Check query string if not found yet
+        # 1. Check query string for __path__ injected by vercel.json rewrite
         qs = environ.get("QUERY_STRING", "")
-        if qs:
+        if qs and "__path__=" in qs:
             params = urllib.parse.parse_qs(qs)
-            if not resolved_path and "__path__" in params and params["__path__"]:
-                resolved_path = "/" + params["__path__"][0].lstrip("/")
-            
-            # Clean up __path__ from query string
-            if "__path__" in params:
+            if "__path__" in params and params["__path__"]:
+                raw_target = params["__path__"][0]
+                clean = urllib.parse.unquote(raw_target).split("?")[0]
+                resolved_path = "/" + clean.lstrip("/")
                 del params["__path__"]
                 environ["QUERY_STRING"] = urllib.parse.urlencode(params, doseq=True)
 
-        # 3. Check Vercel proxy headers if still not resolved
+        # 2. Check RAW_URI or REQUEST_URI if __path__ was not extracted from query string
         if not resolved_path:
-            for h in ("HTTP_X_FORWARDED_PATH", "HTTP_X_MATCHED_PATH", "HTTP_X_FORWARDED_URI"):
+            for uri_key in ("RAW_URI", "REQUEST_URI"):
+                uri_val = environ.get(uri_key, "")
+                if uri_val and "__path__=" in uri_val:
+                    m = re.search(r"[?&]__path__=([^&]+)", uri_val)
+                    if m:
+                        clean = urllib.parse.unquote(m.group(1)).split("?")[0]
+                        resolved_path = "/" + clean.lstrip("/")
+                        break
+
+        # 3. Check Vercel proxy headers as fallback (strictly ignoring regex patterns like '(.*)')
+        if not resolved_path:
+            for h in ("HTTP_X_FORWARDED_PATH", "HTTP_X_FORWARDED_URI"):
                 val = environ.get(h, "")
-                if val and not val.startswith("/api/index"):
+                if val and not val.startswith("/api/index") and "(" not in val and "*" not in val:
                     resolved_path = "/" + val.split("?")[0].lstrip("/")
                     break
 
-        # 4. Apply resolved path or fallback
+        # 4. Apply resolved path or preserve valid existing path
         if resolved_path:
             environ["PATH_INFO"] = resolved_path
         else:
             path_info = environ.get("PATH_INFO", "")
-            if path_info in ("/api/index", "/api/index.py", "/api/", "/api"):
+            if path_info in ("/api/index", "/api/index.py", "/api/", "/api", ""):
                 environ["PATH_INFO"] = "/"
 
         return self.wsgi_app(environ, start_response)
 
-# Wrap WSGI application
-app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
+# Wrap WSGI application once
+if not getattr(app, "_vercel_middleware_applied", False):
+    app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
+    app._vercel_middleware_applied = True
 app.debug = False
 
 # For direct local testing: python api/index.py

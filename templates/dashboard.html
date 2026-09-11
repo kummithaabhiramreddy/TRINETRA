@@ -15,6 +15,9 @@
   <!-- Leaflet MarkerCluster CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.1/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.1/dist/MarkerCluster.Default.css" />
+  <!-- Neon PostgreSQL Client & Auth System -->
+  <script src="/assets/js/neon-db.js"></script>
+  <script src="/assets/js/auth.js"></script>
   <style>
     :root {
       --bg-950: #070A0E;
@@ -2565,8 +2568,8 @@
     setInterval(refreshLiveDetections, 3000);
   </script>
 
-  <script src="assets/js/neon-db.js"></script>
-  <script src="assets/js/auth.js"></script>
+  <script src="/assets/js/neon-db.js"></script>
+  <script src="/assets/js/auth.js"></script>
   <script>
     // --- Account Profile & Session Management ---
     (function initAccountModule() {
