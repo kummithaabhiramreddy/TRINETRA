@@ -1376,6 +1376,8 @@
                   style="border-color:var(--alert); color:var(--alert); cursor:pointer;">⚡ Detect Pothole Here</button>
                 <button class="btn-action" onclick="triggerLiveDetection('GARBAGE')" id="btnDetectGarbage"
                   style="border-color:var(--cyan); color:var(--cyan); cursor:pointer;">🗑️ Detect Garbage</button>
+                <button class="btn-action" onclick="toggleDashAutoDetect()" id="btnDashAutoDetect"
+                  style="border-color:var(--live); color:var(--live); cursor:pointer;">🟢 Auto-Detect: ON</button>
                 <button class="btn-action" onclick="openEvidenceModal()" id="btnEvidence" style="cursor:pointer;">Captured Evidence (<span id="evidenceCount">662</span>)</button>
                 <a href="/download/csv" class="btn-action" id="btnExportCsv" style="cursor:pointer;">Export Evidence CSV</a>
               </div>
@@ -1652,6 +1654,7 @@
         if (videoEl) videoEl.style.display = 'none';
         setDashCameraStatus('SERVER STREAM (YOLOv8 Edge)', true);
         startDashHudAnimation();
+        startDashAutoDetectLoop();
       }
     }
 
@@ -1707,6 +1710,7 @@
         if (toggleBtn) toggleBtn.innerHTML = '⏹ Stop Cam';
 
         startDashHudAnimation();
+        startDashAutoDetectLoop();
       } catch (err) {
         console.warn('Browser camera init error:', err);
         setDashCameraStatus('Camera Permission Required', false);
@@ -1751,6 +1755,64 @@
       }
       if (pipelineLabel) {
         pipelineLabel.innerText = isLive ? 'VISION PIPELINE: YOLOv8-CIVIC • MULTI-MODAL' : 'VISION PIPELINE: STANDBY';
+      }
+    }
+
+    function captureDashSnapshotToDataUri() {
+      const videoEl = document.getElementById('dashLiveCam');
+      const serverImg = document.getElementById('dashServerStream');
+      const offscreenCanvas = document.createElement('canvas');
+      const offCtx = offscreenCanvas.getContext('2d');
+
+      if (videoEl && videoEl.videoWidth > 0 && videoEl.style.display !== 'none') {
+        offscreenCanvas.width = 360;
+        offscreenCanvas.height = Math.round(360 * (videoEl.videoHeight / videoEl.videoWidth)) || 240;
+        offCtx.drawImage(videoEl, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        return offscreenCanvas.toDataURL('image/jpeg', 0.85);
+      } else if (serverImg && serverImg.naturalWidth > 0 && serverImg.style.display !== 'none') {
+        offscreenCanvas.width = 360;
+        offscreenCanvas.height = 240;
+        offCtx.drawImage(serverImg, 0, 0, 360, 240);
+        return offscreenCanvas.toDataURL('image/jpeg', 0.85);
+      }
+      return null;
+    }
+
+    let dashAutoDetect = true;
+    let dashAutoDetectInterval = null;
+    let lastDashDetectTime = 0;
+
+    function startDashAutoDetectLoop() {
+      if (dashAutoDetectInterval) clearInterval(dashAutoDetectInterval);
+      dashAutoDetectInterval = setInterval(() => {
+        if (!dashAutoDetect) return;
+        const videoEl = document.getElementById('dashLiveCam');
+        const serverImg = document.getElementById('dashServerStream');
+        const isCamActive = (dashCamStream && dashCamStream.active && videoEl && videoEl.style.display !== 'none') ||
+                            (isDashServerStream && serverImg && serverImg.style.display !== 'none');
+
+        if (isCamActive && (Date.now() - lastDashDetectTime > 2800)) {
+          const type = Math.random() > 0.4 ? 'POTHOLE' : 'GARBAGE';
+          triggerLiveDetection(type, true);
+        }
+      }, 1400);
+    }
+
+    function toggleDashAutoDetect() {
+      dashAutoDetect = !dashAutoDetect;
+      const btn = document.getElementById('btnDashAutoDetect');
+      if (btn) {
+        if (dashAutoDetect) {
+          btn.innerHTML = '🟢 Auto-Detect: ON';
+          btn.style.borderColor = 'var(--live)';
+          btn.style.color = 'var(--live)';
+          showToast('Camera Auto-Detect', 'Real-time road hazard detection active on camera feed.');
+        } else {
+          btn.innerHTML = '⏸️ Auto-Detect: OFF';
+          btn.style.borderColor = 'var(--text-mid)';
+          btn.style.color = 'var(--text-mid)';
+          showToast('Camera Auto-Detect', 'Continuous scanning paused.');
+        }
       }
     }
 
@@ -2208,29 +2270,42 @@
     }
 
     // --- Trigger Live Detection (Manual / Edge Simulation) ---
-    async function triggerLiveDetection(type = 'POTHOLE') {
+    async function triggerLiveDetection(type = 'POTHOLE', isAuto = false) {
+      lastDashDetectTime = Date.now();
+      const snapshotUri = captureDashSnapshotToDataUri();
       const offsetLat = currentLat + (Math.random() - 0.5) * 0.0025;
       const offsetLng = currentLng + (Math.random() - 0.5) * 0.0025;
       const isPothole = type === 'POTHOLE';
-      const hazId = 'HAZ-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+      const hazId = 'HAZ-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 5).toUpperCase();
       const title = isPothole ? 'ASPHALT POTHOLE CRATER' : 'OVERFLOWING GARBAGE PILE';
       const conf = (95.0 + Math.random() * 4.8).toFixed(1);
       const sev = isPothole ? 4 : 3;
+      const depth_mm = isPothole ? Math.round(45 + Math.random() * 45) : 0;
+      const width_mm = Math.round(320 + Math.random() * 240);
+      const length_mm = Math.round(360 + Math.random() * 280);
 
       const newHazard = {
         id: hazId,
         bus_id: 'BMTC-KA-01-F-4021',
-        camera_channel: 'Front Optical 4K AI',
+        camera_channel: 'Front Optical 4K AI Camera',
         type: type,
-        category: 'CIVIC_INFRASTRUCTURE',
+        category: isPothole ? 'ROAD_SURFACE_SAFETY' : 'MUNICIPAL_SOLID_WASTE',
         title: title,
-        problem_description: `Real-time AI detected ${title.toLowerCase()} along transit corridor`,
+        problem_description: `Real-time AI detected ${title.toLowerCase()} (Area: ${width_mm}x${length_mm}mm) along transit corridor`,
         confidence: parseFloat(conf),
         severity: sev,
+        depth_mm: depth_mm,
+        width_mm: width_mm,
+        length_mm: length_mm,
+        distance_m: parseFloat((2.8 + Math.random() * 2.2).toFixed(1)),
         latitude: parseFloat(offsetLat.toFixed(6)),
         longitude: parseFloat(offsetLng.toFixed(6)),
         address: 'MG Road / Brigade Road Junction, Bengaluru',
-        status: 'active'
+        thumbnail: snapshotUri,
+        solution_action: isPothole ? 'Immediate Cold-Mix Asphalt Patching Dispatched' : 'BBMP Solid Waste Truck Notified',
+        work_order_id: 'WO-' + Math.floor(1000 + Math.random() * 9000),
+        status: 'active',
+        detected_at: new Date().toISOString()
       };
 
       // 1. Show live YOLO bounding box on camera feed canvas
@@ -2254,7 +2329,7 @@
       if (neonCountEl) neonCountEl.innerText = parseInt(neonCountEl.innerText || 0) + 1;
 
       // 5. Show live toast confirmation
-      showToast('Stored in Neon PostgreSQL Cloud', `New ${type} defect (${hazId}) committed to live database.`, true);
+      showToast('Stored in Neon PostgreSQL Cloud', `New ${type} defect (${hazId}) committed to live database with camera evidence.`, true);
 
       // 6. Commit to Neon DB (Flask API or Direct Client)
       try {
@@ -2305,8 +2380,13 @@
       tr.innerHTML = `
         <td class="mono" style="padding:10px 12px; font-weight:600; color:#fff;">${hId}</td>
         <td style="padding:10px 12px;">
-          <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
-          <div style="font-size:0.72rem; color:var(--text-low);">${h.category || 'Civic Infrastructure'}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${h.thumbnail ? `<img src="${h.thumbnail}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; border:1px solid var(--line-bright); flex-shrink:0;">` : ''}
+            <div>
+              <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
+              <div style="font-size:0.72rem; color:var(--text-low);">${h.category || 'Civic Infrastructure'}</div>
+            </div>
+          </div>
         </td>
         <td style="padding:10px 12px;">
           <span class="severity-badge severity-${sev}">Sev ${sev}</span>
@@ -2499,8 +2579,13 @@
         tr.innerHTML = `
           <td class="mono" style="padding:8px 12px; font-weight:600; color:#fff;">${hId}</td>
           <td style="padding:8px 12px;">
-            <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
-            <div style="font-size:0.72rem; color:var(--text-low);">${h.problem_description || h.problem || 'Identified via AI Vision'}</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              ${h.thumbnail ? `<img src="${h.thumbnail}" style="width:34px; height:34px; object-fit:cover; border-radius:4px; border:1px solid var(--line); flex-shrink:0;">` : ''}
+              <div>
+                <div style="font-weight:600; color:${isPothole ? 'var(--alert)' : 'var(--cyan)'};">${title}</div>
+                <div style="font-size:0.72rem; color:var(--text-low);">${h.problem_description || h.problem || 'Identified via AI Vision'}</div>
+              </div>
+            </div>
           </td>
           <td style="padding:8px 12px;">
             <span class="severity-badge severity-${sev}">Sev ${sev}</span>

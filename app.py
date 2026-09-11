@@ -537,6 +537,78 @@ def video_feed():
 
 # --- API Endpoints ---
 
+@app.route("/api/detect_frame", methods=["POST", "OPTIONS"])
+def detect_frame():
+    """Analyze a single camera frame from browser and return detected bounding boxes and metrics."""
+    if request.method == "OPTIONS":
+        res = Response()
+        res.headers["Access-Control-Allow-Origin"] = "*"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        res.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        return res
+
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        img_b64 = data.get("image", "")
+        detections = []
+
+        if HAS_CV2 and HAS_YOLO and (pothole_model or garbage_model) and img_b64:
+            import base64
+            if "," in img_b64:
+                img_b64 = img_b64.split(",", 1)[1]
+            img_bytes = base64.b64decode(img_b64)
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if frame is not None:
+                h, w = frame.shape[:2]
+                if pothole_model:
+                    p_results = pothole_model.predict(frame, conf=0.35, verbose=False)
+                    for r in p_results:
+                        for box in r.boxes:
+                            x1, y1, x2, y2 = box.xyxy[0].tolist()
+                            conf = float(box.conf[0])
+                            detections.append({
+                                "type": "POTHOLE",
+                                "label": "POTHOLE (CRATER)",
+                                "confidence": round(conf * 100, 1),
+                                "severity": 4 if conf > 0.6 else 3,
+                                "x": round(x1 / w, 4),
+                                "y": round(y1 / h, 4),
+                                "w": round((x2 - x1) / w, 4),
+                                "h": round((y2 - y1) / h, 4),
+                                "color": "#EF4444"
+                            })
+                if garbage_model:
+                    g_results = garbage_model.predict(frame, conf=0.35, verbose=False)
+                    for r in g_results:
+                        for box in r.boxes:
+                            x1, y1, x2, y2 = box.xyxy[0].tolist()
+                            conf = float(box.conf[0])
+                            detections.append({
+                                "type": "GARBAGE",
+                                "label": "GARBAGE DUMP",
+                                "confidence": round(conf * 100, 1),
+                                "severity": 3 if conf > 0.6 else 2,
+                                "x": round(x1 / w, 4),
+                                "y": round(y1 / h, 4),
+                                "w": round((x2 - x1) / w, 4),
+                                "h": round((y2 - y1) / h, 4),
+                                "color": "#00E5FF"
+                            })
+
+        flask_res = jsonify({
+            "status": "success",
+            "server_yolo_active": bool(HAS_CV2 and HAS_YOLO and (pothole_model or garbage_model)),
+            "detections": detections
+        })
+        flask_res.headers["Access-Control-Allow-Origin"] = "*"
+        return flask_res
+    except Exception as e:
+        flask_res = jsonify({"status": "error", "message": str(e), "detections": []})
+        flask_res.headers["Access-Control-Allow-Origin"] = "*"
+        return flask_res
+
 @app.route("/api/metrics")
 def get_metrics():
     """Return live metric counters directly from the Neon PostgreSQL Cloud database."""
