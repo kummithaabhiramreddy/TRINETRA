@@ -822,7 +822,7 @@ def serve_static_asset(filename):
 
     if clean in ("dashboard", "dashboard.html"):
         return render_template("dashboard.html")
-    if clean in ("login", "login.html"):
+    if clean in ("login", "login.html", "register", "register.html", "signup", "signup.html"):
         return render_template("login.html")
     if clean in ("camera", "camera.html"):
         return render_template("camera.html")
@@ -838,11 +838,11 @@ def serve_static_asset(filename):
         return render_template("index.html")
 
     for folder in [BASE_DIR, TEMPLATES_DIR, ASSETS_DIR]:
-        path = os.path.join(folder, filename)
+        path = os.path.join(folder, clean)
         if os.path.isfile(path):
             return send_file(path)
-        if filename.startswith("assets/"):
-            sub_path = os.path.join(folder, filename[7:])
+        if clean.startswith("assets/"):
+            sub_path = os.path.join(folder, clean[7:])
             if os.path.isfile(sub_path):
                 return send_file(sub_path)
     return "Not Found", 404
